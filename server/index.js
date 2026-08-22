@@ -308,6 +308,32 @@ app.post('/api/leaves/apply', async (req, res) => {
   res.json({ success: true, message: 'Leave request submitted', leave: newLeave });
 });
 
+app.put('/api/leaves/:id/status', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  const numericId = id.replace('LV-', '');
+  
+  try {
+    const isDbConnected = await testConnection();
+    if (isDbConnected) {
+      await query(
+        'UPDATE leave_requests SET status = ? WHERE id = ?',
+        [status, numericId]
+      );
+      return res.json({ success: true, message: `Leave ${status} successfully in MySQL` });
+    }
+  } catch (err) {
+    console.warn('MySQL Update Leave Error:', err.message);
+  }
+
+  // Fallback for inMemoryDb
+  const leave = inMemoryDb.leaves.find(l => l.id === id || l.id === `LV-${numericId}`);
+  if (leave) {
+    leave.status = status;
+  }
+  res.json({ success: true, message: `Leave ${status} in memory` });
+});
+
 // Start Server
 app.listen(PORT, async () => {
   const isDbConnected = await testConnection();

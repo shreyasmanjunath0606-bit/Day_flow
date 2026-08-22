@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 import { getEmployeeProfile, updateEmployeeProfile } from '../services/employeeService';
 import { MOCK_WEEKLY_ATTENDANCE, MOCK_DAILY_TIMELINE, ATTENDANCE_STATUS_TYPES } from '../services/attendanceService';
-import { getStoredLeaves, addLeaveRequest, updateStoredEmployeeProfile } from '../services/storeService';
+import { updateStoredEmployeeProfile } from '../services/storeService';
+import { fetchLeaves, applyLeave } from '../services/leaveService';
 import './Dashboard.css';
 
 const RECENT_ACTIVITY = [
@@ -87,7 +88,7 @@ export default function EmployeeDashboard() {
   const [weeklyRecords, setWeeklyRecords] = useState(MOCK_WEEKLY_ATTENDANCE);
 
   // Leave Management States - Synced with Store
-  const [myLeaves, setMyLeaves] = useState(() => getStoredLeaves());
+  const [myLeaves, setMyLeaves] = useState([]);
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [newLeaveForm, setNewLeaveForm] = useState({
     type: 'Casual Leave',
@@ -103,13 +104,19 @@ export default function EmployeeDashboard() {
     });
   }, []);
 
-  // Sync Store Updates in Real-Time
+  // Fetch Leaves & Sync in Real-Time via Polling
   useEffect(() => {
-    const handleStoreChange = () => {
-      setMyLeaves(getStoredLeaves());
+    const loadLeaves = async () => {
+      const data = await fetchLeaves();
+      setMyLeaves(data);
     };
-    window.addEventListener('dayflow_store_update', handleStoreChange);
-    return () => window.removeEventListener('dayflow_store_update', handleStoreChange);
+    
+    loadLeaves(); // Initial load
+    
+    // Poll every 5 seconds for real-time sync with HR
+    const intervalId = setInterval(loadLeaves, 5000);
+    
+    return () => clearInterval(intervalId);
   }, []);
 
   useEffect(() => {
@@ -236,7 +243,7 @@ export default function EmployeeDashboard() {
     setTimeout(() => setSaveSuccessMsg(''), 4000);
   };
 
-  const handleApplyLeaveSubmit = (e) => {
+  const handleApplyLeaveSubmit = async (e) => {
     e.preventDefault();
     if (!newLeaveForm.fromDate || !newLeaveForm.toDate) {
       alert('Please select both From Date and To Date');
@@ -249,21 +256,19 @@ export default function EmployeeDashboard() {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
 
     const newLeaveObj = {
-      id: `LV-${Math.floor(100 + Math.random() * 900)}`,
-      employee: profileData?.personalDetails?.fullName || 'Alex Morgan',
-      avatar: 'AM',
       type: newLeaveForm.type,
-      from: newLeaveForm.fromDate,
-      to: newLeaveForm.toDate,
       fromDate: newLeaveForm.fromDate,
       toDate: newLeaveForm.toDate,
       days: isNaN(diffDays) ? 1 : diffDays,
       reason: newLeaveForm.reason || 'Personal leave request',
-      status: 'pending',
-      appliedDate: 'Just Now',
     };
 
-    addLeaveRequest(newLeaveObj);
+    await applyLeave(newLeaveObj);
+    
+    // Fetch updated leaves immediately
+    const data = await fetchLeaves();
+    setMyLeaves(data);
+
     setIsLeaveModalOpen(false);
     setNewLeaveForm({ type: 'Casual Leave', fromDate: '', toDate: '', reason: '' });
     

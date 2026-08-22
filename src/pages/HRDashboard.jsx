@@ -6,7 +6,8 @@ import {
   TrendingUp, Search, ChevronRight, BarChart3, UserCheck,
   Settings, Menu, X, ChevronDown, Check, ArrowUpDown, Edit3, Save, Shield, Eye, CalendarRange, Filter, User, Mail, Phone, MapPin, DollarSign, PieChart, Image as ImageIcon, Camera
 } from 'lucide-react';
-import { getStoredEmployees, getStoredLeaves, updateLeaveStatus, updateStoredEmployeeProfile } from '../services/storeService';
+import { getStoredEmployees, updateStoredEmployeeProfile } from '../services/storeService';
+import { fetchLeaves, updateLeaveStatusAPI } from '../services/leaveService';
 import './Dashboard.css';
 
 const HR_NOTIFICATIONS = [
@@ -24,7 +25,7 @@ export default function HRDashboard() {
   
   // Real-time Synced States from Central Store
   const [employees, setEmployees] = useState(() => getStoredEmployees());
-  const [leaveRequests, setLeaveRequests] = useState(() => getStoredLeaves());
+  const [leaveRequests, setLeaveRequests] = useState([]);
   
   // Notification Dropdown State
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -52,14 +53,26 @@ export default function HRDashboard() {
   // Admin View Attendance Modal State
   const [viewingAttendanceEmp, setViewingAttendanceEmp] = useState(null);
 
-  // Listen for Real-Time Synchronization Events across Dashboards
+  // Listen for Real-Time Synchronization Events across Dashboards (Employees)
   useEffect(() => {
     const handleStoreChange = () => {
       setEmployees(getStoredEmployees());
-      setLeaveRequests(getStoredLeaves());
     };
     window.addEventListener('dayflow_store_update', handleStoreChange);
     return () => window.removeEventListener('dayflow_store_update', handleStoreChange);
+  }, []);
+
+  // Fetch Leaves & Sync in Real-Time via Polling
+  useEffect(() => {
+    const loadLeaves = async () => {
+      const data = await fetchLeaves();
+      setLeaveRequests(data);
+    };
+    
+    loadLeaves();
+    
+    const intervalId = setInterval(loadLeaves, 5000);
+    return () => clearInterval(intervalId);
   }, []);
 
   const pendingCount = leaveRequests.filter(l => l.status === 'pending').length;
@@ -87,8 +100,13 @@ export default function HRDashboard() {
     return matchesSearch && emp.status === attendanceStatusFilter;
   });
 
-  const handleLeaveAction = (id, action) => {
-    updateLeaveStatus(id, action);
+  const handleLeaveAction = async (id, action) => {
+    await updateLeaveStatusAPI(id, action);
+    
+    // Fetch updated leaves immediately
+    const data = await fetchLeaves();
+    setLeaveRequests(data);
+
     setSuccessToast(`Leave request ${action === 'approved' ? 'APPROVED' : 'REJECTED'} successfully! Emitted to Employee Dashboard.`);
     setTimeout(() => setSuccessToast(''), 4000);
   };
