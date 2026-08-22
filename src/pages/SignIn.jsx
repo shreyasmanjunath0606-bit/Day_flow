@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Zap } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Zap, User, ShieldCheck } from 'lucide-react';
 import './Auth.css';
 
 export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState('employee'); // 'employee' | 'hr'
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
   const validate = () => {
     const newErrors = {};
@@ -28,12 +30,16 @@ export default function SignIn() {
     }
     setErrors({});
     setIsLoading(true);
-    // Simulate login — in real app, redirect based on role
+    
+    // Role-based navigation for Admin vs Employee
     setTimeout(() => {
       setIsLoading(false);
-      // For demo, navigate based on a dummy check
-      window.location.href = '/dashboard/employee';
-    }, 1500);
+      if (role === 'hr') {
+        navigate('/dashboard/hr');
+      } else {
+        navigate('/dashboard/employee');
+      }
+    }, 1200);
   };
 
   return (
@@ -75,7 +81,7 @@ export default function SignIn() {
               </div>
               <div className="auth-feature">
                 <div className="auth-feature-dot" />
-                <span>HR analytics dashboard</span>
+                <span>HR & Admin analytics dashboard</span>
               </div>
             </div>
           </div>
@@ -97,7 +103,30 @@ export default function SignIn() {
 
             <div className="auth-form-header">
               <h2 className="auth-form-title">Welcome back</h2>
-              <p className="auth-form-subtitle">Sign in to your account to continue</p>
+              <p className="auth-form-subtitle">Select your account role to sign in</p>
+            </div>
+
+            {/* Role Switcher */}
+            <div className="form-group" style={{ marginBottom: '1.25rem' }}>
+              <label className="form-label">Account Type</label>
+              <div className="role-selector">
+                <button
+                  type="button"
+                  className={`role-option ${role === 'employee' ? 'role-option-active' : ''}`}
+                  onClick={() => setRole('employee')}
+                >
+                  <User size={18} />
+                  <span>Employee</span>
+                </button>
+                <button
+                  type="button"
+                  className={`role-option ${role === 'hr' ? 'role-option-active' : ''}`}
+                  onClick={() => setRole('hr')}
+                >
+                  <ShieldCheck size={18} />
+                  <span>HR / Admin</span>
+                </button>
+              </div>
             </div>
 
             <form className="auth-form" onSubmit={handleSubmit}>
@@ -109,7 +138,7 @@ export default function SignIn() {
                     id="email"
                     type="email"
                     className="form-input"
-                    placeholder="you@company.com"
+                    placeholder={role === 'hr' ? 'admin@company.com' : 'you@company.com'}
                     value={email}
                     onChange={(e) => { setEmail(e.target.value); setErrors(prev => ({...prev, email: ''})); }}
                   />
@@ -147,7 +176,7 @@ export default function SignIn() {
                   <span className="form-checkbox-custom" />
                   <span>Remember me</span>
                 </label>
-                <a href="#" className="form-link">Forgot password?</a>
+                <a href="#" className="form-link" onClick={(e) => e.preventDefault()}>Forgot password?</a>
               </div>
 
               <button type="submit" className="btn-primary btn-full" disabled={isLoading}>
@@ -155,7 +184,7 @@ export default function SignIn() {
                   <div className="btn-spinner" />
                 ) : (
                   <>
-                    Sign In
+                    Sign In as {role === 'hr' ? 'HR / Admin' : 'Employee'}
                     <ArrowRight size={18} />
                   </>
                 )}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Mail, Lock, Eye, EyeOff, ArrowRight, Zap,
   User, BadgeCheck, ShieldCheck, CheckCircle2, XCircle
@@ -26,7 +26,8 @@ export default function SignUp() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [step, setStep] = useState(1); // 1: form, 2: email verification
+  const [step, setStep] = useState(1); // 1: form, 2: account created & verification
+  const navigate = useNavigate();
 
   const updateField = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -35,7 +36,7 @@ export default function SignUp() {
 
   const validate = () => {
     const e = {};
-    if (!form.employeeId.trim()) e.employeeId = 'Employee ID is required';
+    if (!form.employeeId.trim()) e.employeeId = 'Employee / Admin ID is required';
     if (!form.email) e.email = 'Email is required';
     else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Enter a valid email';
     if (!form.password) e.password = 'Password is required';
@@ -60,7 +61,7 @@ export default function SignUp() {
     setTimeout(() => {
       setIsLoading(false);
       setStep(2);
-    }, 1800);
+    }, 1500);
   };
 
   const passwordStrength = form.password
@@ -81,21 +82,32 @@ export default function SignUp() {
         <div className="auth-grid-overlay" />
         <div className="verification-container">
           <div className="verification-card">
-            <div className="verification-icon">
-              <Mail size={48} />
+            <div className="verification-icon" style={{ background: form.role === 'hr' ? 'rgba(236, 72, 153, 0.15)' : 'rgba(99, 102, 241, 0.15)', color: form.role === 'hr' ? 'var(--accent-400)' : 'var(--primary-400)' }}>
+              {form.role === 'hr' ? <ShieldCheck size={48} /> : <Mail size={48} />}
             </div>
-            <h2 className="verification-title">Check your email</h2>
+            <h2 className="verification-title">
+              {form.role === 'hr' ? 'Admin Account Registered!' : 'Check your email'}
+            </h2>
             <p className="verification-text">
-              We've sent a verification link to <strong>{form.email}</strong>.
-              Please check your inbox and click the link to verify your account.
+              {form.role === 'hr' ? (
+                <>Your HR / Admin account (<strong>{form.email}</strong>) has been registered. You can now access full admin privileges.</>
+              ) : (
+                <>We've sent a verification link to <strong>{form.email}</strong>. Please check your inbox to activate your account.</>
+              )}
             </p>
-            <div className="verification-info">
-              <p>Didn't receive the email?</p>
-              <button className="btn-ghost" onClick={() => {}}>Resend verification email</button>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.5rem', width: '100%' }}>
+              <button
+                className="btn-primary btn-full"
+                onClick={() => navigate(form.role === 'hr' ? '/dashboard/hr' : '/dashboard/employee')}
+              >
+                Go to {form.role === 'hr' ? 'HR / Admin Dashboard' : 'Employee Dashboard'} <ArrowRight size={18} />
+              </button>
+
+              <Link to="/signin" className="btn-secondary btn-full" style={{ display: 'flex', justifyContent: 'center' }}>
+                Sign In to Account
+              </Link>
             </div>
-            <Link to="/signin" className="btn-secondary btn-full" style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'center' }}>
-              Back to Sign In
-            </Link>
           </div>
         </div>
       </div>
@@ -165,14 +177,16 @@ export default function SignUp() {
             <form className="auth-form" onSubmit={handleSubmit}>
               {/* Employee ID */}
               <div className={`form-group ${errors.employeeId ? 'form-group-error' : ''}`}>
-                <label className="form-label" htmlFor="employeeId">Employee ID</label>
+                <label className="form-label" htmlFor="employeeId">
+                  {form.role === 'hr' ? 'Admin / HR ID' : 'Employee ID'}
+                </label>
                 <div className="form-input-wrapper">
                   <BadgeCheck size={18} className="form-input-icon" />
                   <input
                     id="employeeId"
                     type="text"
                     className="form-input"
-                    placeholder="e.g. EMP-001"
+                    placeholder={form.role === 'hr' ? 'e.g. ADM-001' : 'e.g. EMP-001'}
                     value={form.employeeId}
                     onChange={(e) => updateField('employeeId', e.target.value)}
                   />
@@ -189,7 +203,7 @@ export default function SignUp() {
                     id="email"
                     type="email"
                     className="form-input"
-                    placeholder="you@company.com"
+                    placeholder={form.role === 'hr' ? 'admin@company.com' : 'you@company.com'}
                     value={form.email}
                     onChange={(e) => updateField('email', e.target.value)}
                   />
@@ -199,7 +213,7 @@ export default function SignUp() {
 
               {/* Role */}
               <div className="form-group">
-                <label className="form-label">Role</label>
+                <label className="form-label">Register As</label>
                 <div className="role-selector">
                   <button
                     type="button"
@@ -310,7 +324,7 @@ export default function SignUp() {
                   <div className="btn-spinner" />
                 ) : (
                   <>
-                    Create Account
+                    Register as {form.role === 'hr' ? 'HR / Admin' : 'Employee'}
                     <ArrowRight size={18} />
                   </>
                 )}
