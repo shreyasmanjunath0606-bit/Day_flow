@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { getEmployeeProfile, updateEmployeeProfile } from '../services/employeeService';
 import { MOCK_WEEKLY_ATTENDANCE, MOCK_DAILY_TIMELINE, ATTENDANCE_STATUS_TYPES } from '../services/attendanceService';
+import { getStoredLeaves, addLeaveRequest, updateStoredEmployeeProfile } from '../services/storeService';
 import './Dashboard.css';
 
 const RECENT_ACTIVITY = [
@@ -47,6 +48,13 @@ const RECENT_ACTIVITY = [
   },
 ];
 
+const INITIAL_NOTIFICATIONS = [
+  { id: 1, title: 'Leave Request Approved', desc: 'HR approved your 2 days casual leave for Aug 25–26', time: '10 mins ago', unread: true, icon: <CheckCircle2 size={16} />, color: 'var(--success-400)' },
+  { id: 2, title: 'Shift Check-in Recorded', desc: 'Successfully checked in at 09:02 AM', time: '3 hours ago', unread: true, icon: <Clock size={16} />, color: 'var(--primary-400)' },
+  { id: 3, title: 'July Payslip Ready', desc: 'Your net pay of $9,433 has been disbursed', time: '1 day ago', unread: false, icon: <DollarSign size={16} />, color: 'var(--success-400)' },
+  { id: 4, title: 'Policy Update', desc: 'New hybrid workplace guidelines effective Sep 1', time: '2 days ago', unread: false, icon: <AlertCircle size={16} />, color: 'var(--warning-400)' },
+];
+
 const QUICK_STATS = [
   { label: 'Days Present', value: '18', sub: 'this month', icon: <CalendarCheck size={22} />, color: 'var(--success-400)' },
   { label: 'Leaves Used', value: '3', sub: 'of 24 annual', icon: <Calendar size={22} />, color: 'var(--warning-400)' },
@@ -54,34 +62,32 @@ const QUICK_STATS = [
   { label: 'On-Time Rate', value: '95%', sub: 'last 30 days', icon: <TrendingUp size={22} />, color: 'var(--accent-400)' },
 ];
 
-const INITIAL_MY_LEAVES = [
-  { id: 'LV-101', type: 'Casual Leave', fromDate: '2026-08-25', toDate: '2026-08-26', days: 2, reason: 'Personal errands and home maintenance', status: 'approved', appliedDate: 'Aug 20, 2026' },
-  { id: 'LV-102', type: 'Sick Leave', fromDate: '2026-08-10', toDate: '2026-08-10', days: 1, reason: 'High fever and doctor consultation', status: 'approved', appliedDate: 'Aug 09, 2026' },
-  { id: 'LV-103', type: 'Annual Vacation', fromDate: '2026-09-01', toDate: '2026-09-05', days: 5, reason: 'Family trip to national park', status: 'pending', appliedDate: 'Aug 21, 2026' },
-];
-
 export default function EmployeeDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'profile' | 'attendance' | 'leaves'
-  const [profileSubTab, setProfileSubTab] = useState('personal'); // 'personal' | 'job' | 'salary' | 'documents'
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [profileSubTab, setProfileSubTab] = useState('personal');
   const [profileData, setProfileData] = useState(null);
   
+  // Notification Dropdown State
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+
   // Edit Profile States
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState({});
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
 
   // Attendance Tracking States
-  const [attendanceView, setAttendanceView] = useState('daily'); // 'daily' | 'weekly'
+  const [attendanceView, setAttendanceView] = useState('daily');
   const [isCheckedIn, setIsCheckedIn] = useState(true);
   const [checkInTime, setCheckInTime] = useState('09:02 AM');
   const [checkOutTime, setCheckOutTime] = useState('—');
-  const [workSeconds, setWorkSeconds] = useState(15735); // ~4 hours 22 mins
-  const [todayStatus, setTodayStatus] = useState('PRESENT'); // 'PRESENT' | 'HALF_DAY' | 'ABSENT' | 'LEAVE'
+  const [workSeconds, setWorkSeconds] = useState(15735);
+  const [todayStatus, setTodayStatus] = useState('PRESENT');
   const [weeklyRecords, setWeeklyRecords] = useState(MOCK_WEEKLY_ATTENDANCE);
 
-  // Leave Management States
-  const [myLeaves, setMyLeaves] = useState(INITIAL_MY_LEAVES);
+  // Leave Management States - Synced with Store
+  const [myLeaves, setMyLeaves] = useState(() => getStoredLeaves());
   const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [newLeaveForm, setNewLeaveForm] = useState({
     type: 'Casual Leave',
@@ -97,7 +103,15 @@ export default function EmployeeDashboard() {
     });
   }, []);
 
-  // Timer loop for active check-in
+  // Sync Store Updates in Real-Time
+  useEffect(() => {
+    const handleStoreChange = () => {
+      setMyLeaves(getStoredLeaves());
+    };
+    window.addEventListener('dayflow_store_update', handleStoreChange);
+    return () => window.removeEventListener('dayflow_store_update', handleStoreChange);
+  }, []);
+
   useEffect(() => {
     let interval = null;
     if (isCheckedIn) {
@@ -210,9 +224,15 @@ export default function EmployeeDashboard() {
 
     setProfileData(updated);
     updateEmployeeProfile(updated);
+    updateStoredEmployeeProfile('EMP-001', {
+      phone: editFormData.phone,
+      address: editFormData.address,
+      avatarUrl: editFormData.avatarUrl,
+      fullName: editFormData.fullName,
+    });
     setIsEditModalOpen(false);
     
-    setSaveSuccessMsg('Your profile details & picture have been updated successfully!');
+    setSaveSuccessMsg('Your profile details & picture have been updated and synced with HR Admin!');
     setTimeout(() => setSaveSuccessMsg(''), 4000);
   };
 
@@ -230,7 +250,11 @@ export default function EmployeeDashboard() {
 
     const newLeaveObj = {
       id: `LV-${Math.floor(100 + Math.random() * 900)}`,
+      employee: profileData?.personalDetails?.fullName || 'Alex Morgan',
+      avatar: 'AM',
       type: newLeaveForm.type,
+      from: newLeaveForm.fromDate,
+      to: newLeaveForm.toDate,
       fromDate: newLeaveForm.fromDate,
       toDate: newLeaveForm.toDate,
       days: isNaN(diffDays) ? 1 : diffDays,
@@ -239,14 +263,19 @@ export default function EmployeeDashboard() {
       appliedDate: 'Just Now',
     };
 
-    setMyLeaves(prev => [newLeaveObj, ...prev]);
+    addLeaveRequest(newLeaveObj);
     setIsLeaveModalOpen(false);
     setNewLeaveForm({ type: 'Casual Leave', fromDate: '', toDate: '', reason: '' });
     
-    setSaveSuccessMsg(`Leave request (${newLeaveForm.type}) submitted successfully for HR approval!`);
+    setSaveSuccessMsg(`Leave request (${newLeaveForm.type}) submitted successfully and synced to HR Admin for approval!`);
     setTimeout(() => setSaveSuccessMsg(''), 4000);
   };
 
+  const markAllNotificationsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
+  };
+
+  const unreadCount = notifications.filter(n => n.unread).length;
   const personal = profileData?.personalDetails || {};
   const job = profileData?.jobDetails || {};
   const salary = profileData?.salaryStructure || {};
@@ -364,11 +393,54 @@ export default function EmployeeDashboard() {
               </p>
             </div>
           </div>
-          <div className="topbar-right">
-            <button className="topbar-icon-btn" aria-label="Notifications">
+          <div className="topbar-right" style={{ position: 'relative' }}>
+            {/* Notification Bell with Badge & Dropdown */}
+            <button
+              className="topbar-icon-btn"
+              aria-label="Notifications"
+              onClick={() => setNotificationsOpen(prev => !prev)}
+            >
               <Bell size={20} />
-              <span className="topbar-badge">3</span>
+              {unreadCount > 0 && <span className="topbar-badge">{unreadCount}</span>}
             </button>
+
+            {/* Notification Dropdown Panel */}
+            {notificationsOpen && (
+              <div className="notifications-dropdown-menu">
+                <div className="notifications-dropdown-header">
+                  <div className="notifications-dropdown-title">
+                    <Bell size={18} style={{ color: 'var(--primary-400)' }} /> Notifications
+                  </div>
+                  {unreadCount > 0 && (
+                    <button className="btn-ghost-sm" onClick={markAllNotificationsRead} style={{ fontSize: '0.75rem' }}>
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+
+                <div className="notifications-dropdown-body">
+                  {notifications.map((item) => (
+                    <div key={item.id} className={`notification-dropdown-item ${item.unread ? 'unread' : ''}`}>
+                      <div className="notification-dropdown-icon" style={{ background: `${item.color}15`, color: item.color }}>
+                        {item.icon}
+                      </div>
+                      <div>
+                        <div className="notification-dropdown-text">{item.title}</div>
+                        <div className="notification-dropdown-sub">{item.desc}</div>
+                        <div className="notification-dropdown-time">{item.time}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="notifications-dropdown-footer">
+                  <button className="btn-ghost-sm" onClick={() => setNotificationsOpen(false)} style={{ width: '100%', fontSize: '0.8rem' }}>
+                    Close Notifications
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div
               className="topbar-avatar"
               onClick={() => setActiveTab('profile')}
@@ -1008,7 +1080,7 @@ export default function EmployeeDashboard() {
                     {myLeaves.map((leave) => (
                       <tr key={leave.id} className="table-row">
                         <td style={{ fontWeight: 700, color: 'white' }}>{leave.type}</td>
-                        <td className="table-date">{leave.fromDate} to {leave.toDate}</td>
+                        <td className="table-date">{leave.fromDate || leave.from} to {leave.toDate || leave.to}</td>
                         <td style={{ fontWeight: 600, color: 'var(--primary-400)' }}>{leave.days} day(s)</td>
                         <td style={{ color: 'var(--neutral-300)', fontSize: '0.88rem' }}>{leave.reason}</td>
                         <td className="table-time">{leave.appliedDate}</td>
@@ -1104,7 +1176,7 @@ export default function EmployeeDashboard() {
         </div>
       )}
 
-      {/* EDIT PROFILE MODAL (EMPLOYEE SELF-SERVICE) */}
+      {/* EDIT PROFILE MODAL */}
       {isEditModalOpen && (
         <div className="modal-overlay" onClick={() => setIsEditModalOpen(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>

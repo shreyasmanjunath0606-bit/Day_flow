@@ -1,50 +1,51 @@
 # DayFlow - Project Release & Feature Updates
 
-## Major Update: MySQL Database Integration, Leave Requests System & Local Photo Upload
+## Major Update: MySQL Database Integration, Real-Time Dashboard Sync, HR Profile & Workforce Analytics
 
 ### 🚀 Newly Added Features
 
-#### 1. MySQL Database Architecture & Persistence (`dayflow_db`)
-- **Database Engine**: Configured MySQL connection pool using `mysql2/promise` in `server/config/db.js`.
-- **Relational Schema DDL ([`server/schema.sql`](file:///c:/Users/kusum/Desktop/Day_flow/server/schema.sql))**:
-  - `users`: Authentication credentials, hashed passwords, roles (`employee` vs `hr`).
-  - `employee_profiles`: Personal details (DOB, Gender, Phone, Address, Avatar URL, Emergency Contact) & Job details (Designation, Department, Employment Type, Joining Date, Manager, Work Location).
-  - `salary_structures`: Base Pay, HRA, Allowances, Deductions (TDS Tax, PF, Insurance), Net Pay, and Bank Account details.
-  - `attendance_logs`: Daily & weekly shift records, Check-In, Check-Out, Logged Hours, and Status (`PRESENT`, `HALF_DAY`, `ABSENT`, `LEAVE`).
-  - `leave_requests`: Leave types, date ranges, total days, reasons, and approval status (`pending`, `approved`, `rejected`).
-- **Automated Database Seeder ([`server/seed.js`](file:///c:/Users/kusum/Desktop/Day_flow/server/seed.js))**: `npm run seed` command automatically initializes `dayflow_db` and seeds initial test records.
-- **Node.js Express REST APIs ([`server/index.js`](file:///c:/Users/kusum/Desktop/Day_flow/server/index.js))**: Exposes REST endpoints (`/api/health`, `/api/auth/login`, `/api/employee/profile`, `/api/attendance/checkin`, `/api/leaves/apply`).
+#### 1. Centralized Real-Time Synchronization Service ([`src/services/storeService.js`](file:///c:/Users/kusum/Desktop/Day_flow/src/services/storeService.js))
+- Built a reactive store broadcasting real-time updates (`dayflow_store_update`) across the application.
+- **Profile Details Sync**: When an employee edits phone, address, or profile photo in `EmployeeDashboard.jsx`, the update is instantly reflected in the HR Admin Employee Directory (`HRDashboard.jsx`).
+- **Leave Request Sync**: New leave applications submitted by employees instantly appear in the HR Admin's **Leave Approvals** tab.
+- **Approval Status Sync**: When HR approves or rejects a leave request, the status updates live on the employee's Leave Requests tab (`Approved` or `Rejected`).
 
 ---
 
-#### 2. Leave Requests Management System
-- **Employee Leave Dashboard ([`src/pages/EmployeeDashboard.jsx`](file:///c:/Users/kusum/Desktop/Day_flow/src/pages/EmployeeDashboard.jsx))**:
-  - Active **Leave Requests** tab with Leave Balance summary cards (Casual Leave: 8 days, Sick Leave: 6 days, Vacation: 10 days).
-  - **Apply for Leave Modal**: Select leave type, From Date, To Date, and Reason with automatic duration calculation.
-  - **My Leave History & Status Table**: Real-time status tracking (`Pending HR Review`, `Approved`, `Rejected`).
-- **HR Leave Approvals ([`src/pages/HRDashboard.jsx`](file:///c:/Users/kusum/Desktop/Day_flow/src/pages/HRDashboard.jsx))**: HR Admins can review pending leave applications and approve or reject requests.
+#### 2. HR Administrator Profile & Photo Upload ([`src/pages/HRDashboard.jsx`](file:///c:/Users/kusum/Desktop/Day_flow/src/pages/HRDashboard.jsx))
+- Added an interactive **HR Admin Profile Modal** accessible via the HR avatar icon in topbar.
+- Displays HR Admin credentials (Name: Maya Patel, Admin ID: `ADM-001`, Title: Head of HR Operations, Department: Human Resources, Access Level: 🛡️ Super Admin).
+- Includes native device photo picker for HR Admin profile picture updates.
 
 ---
 
-#### 3. Local Computer Photo File Upload for Profile Picture
-- Replaced URL text input with a native device file picker (`<input type="file" accept="image/*" />`).
-- Employees can select any photo file (JPG, PNG, WEBP) directly from their computer folders with instant base64 preview across profile banners, header, and topbar.
+#### 3. Workforce Analytics & Insights Dashboard
+- Activated the **Analytics** menu item (`activeTab === 'analytics'`) in `HRDashboard.jsx`.
+- **Department Headcount Breakdown**: Visual progress bars for Engineering (40%), Design (20%), Marketing (16%), HR (14%), and Analytics (10%).
+- **Punctuality & Attendance Metrics**: 92.4% on-time arrival rate, 8.4 hrs/day average work duration.
+- **Leave Category Usage**: Vacation (68 days), Casual (45 days), Sick (22 days).
+- **Payroll Expense Summary**: $578,000 / month gross salary budget tracking.
 
 ---
 
-#### 4. Role-Based Attendance View Permissions
-- 👤 **Employee View**: Strictly locked to the employee's own shift timer, check-in/out logs, and weekly schedule.
-- 👑 **HR / Admin View**: Master Attendance Dashboard displaying all employee records across the company with status filters (Present, Half-day, Absent, Leave) and detailed log modals.
+#### 4. Interactive Notification Bell Dropdowns
+- Floating Notification Panel in both `EmployeeDashboard.jsx` and `HRDashboard.jsx`.
+- Lists recent system alerts, leave updates, and check-in logs with unread badge counter.
+- Includes a "Mark all read" button to clear notifications instantly.
+
+---
+
+#### 5. MySQL Database Architecture & REST APIs (`dayflow_db`)
+- Relational table DDL in [`server/schema.sql`](file:///c:/Users/kusum/Desktop/Day_flow/server/schema.sql) for `users`, `employee_profiles`, `salary_structures`, `attendance_logs`, and `leave_requests`.
+- Automated seeding script in [`server/seed.js`](file:///c:/Users/kusum/Desktop/Day_flow/server/seed.js).
+- MySQL Connection pool manager in [`server/config/db.js`](file:///c:/Users/kusum/Desktop/Day_flow/server/config/db.js).
+- Node.js Express REST APIs in [`server/index.js`](file:///c:/Users/kusum/Desktop/Day_flow/server/index.js).
 
 ---
 
 ### 📂 Modified & Added Files
-- `server/schema.sql` (MySQL Relational DDL Script)
-- `server/seed.js` (Automated MySQL database seeder)
-- `server/config/db.js` (MySQL Connection Pool manager)
-- `server/.env` (Database environment configuration)
-- `server/index.js` (Node.js Express server with MySQL REST APIs)
-- `src/services/attendanceService.js` (Real-time MySQL attendance & leave API helper service)
-- `src/pages/EmployeeDashboard.jsx` (Added Leave Requests tab, local photo file upload, removed admin mode toggle)
-- `src/pages/HRDashboard.jsx` (Master attendance view for all employees & leave approval cards)
-- `CHANGELOG.md` (Project release updates for evaluators)
+- `src/services/storeService.js` (Central real-time synchronization store)
+- `src/pages/EmployeeDashboard.jsx` (Notification bell dropdown, leave submission sync, profile photo upload)
+- `src/pages/HRDashboard.jsx` (HR Admin profile modal, Analytics dashboard, notification dropdown, real-time leave approvals)
+- `src/pages/Dashboard.css` (Notification dropdown floating panel & analytics progress bar styling)
+- `CHANGELOG.md` (Project release summary)

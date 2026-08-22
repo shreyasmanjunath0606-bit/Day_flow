@@ -1,45 +1,49 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Zap, Users, CalendarCheck, FileCheck, LogOut,
   Bell, Clock, CheckCircle2, XCircle, AlertCircle,
   TrendingUp, Search, ChevronRight, BarChart3, UserCheck,
-  Settings, Menu, X, ChevronDown, Check, ArrowUpDown, Edit3, Save, Shield, Eye, CalendarRange, Filter
+  Settings, Menu, X, ChevronDown, Check, ArrowUpDown, Edit3, Save, Shield, Eye, CalendarRange, Filter, User, Mail, Phone, MapPin, DollarSign, PieChart, Image as ImageIcon, Camera
 } from 'lucide-react';
+import { getStoredEmployees, getStoredLeaves, updateLeaveStatus, updateStoredEmployeeProfile } from '../services/storeService';
 import './Dashboard.css';
 
-const INITIAL_EMPLOYEES = [
-  { id: 'EMP-001', name: 'Alex Morgan', role: 'Senior Frontend Developer', dept: 'Engineering', status: 'present', avatar: 'AM', checkIn: '09:02 AM', checkOut: '05:30 PM', hours: '8.5 hrs', email: 'alex.morgan@dayflow.io', phone: '+1 (555) 234-5678', address: '742 Evergreen Terrace, Springfield, OR', salary: '$145,000' },
-  { id: 'EMP-002', name: 'Sarah Chen', role: 'Lead Product Designer', dept: 'Design', status: 'present', avatar: 'SC', checkIn: '08:55 AM', checkOut: '05:25 PM', hours: '8.5 hrs', email: 'sarah.chen@dayflow.io', phone: '+1 (555) 345-6789', address: '120 Market St, San Francisco, CA', salary: '$150,000' },
-  { id: 'EMP-003', name: 'James Wilson', role: 'Backend Software Engineer', dept: 'Engineering', status: 'absent', avatar: 'JW', checkIn: '—', checkOut: '—', hours: '0.0 hrs', email: 'james.wilson@dayflow.io', phone: '+1 (555) 456-7890', address: '456 Oak Lane, Seattle, WA', salary: '$135,000' },
-  { id: 'EMP-004', name: 'Maya Patel', role: 'HR Operations Manager', dept: 'Human Resources', status: 'present', avatar: 'MP', checkIn: '08:48 AM', checkOut: '05:15 PM', hours: '8.5 hrs', email: 'maya.patel@dayflow.io', phone: '+1 (555) 567-8901', address: '789 Pine Ave, Austin, TX', salary: '$130,000' },
-  { id: 'EMP-005', name: 'David Kim', role: 'Senior Data Analyst', dept: 'Analytics', status: 'on-leave', avatar: 'DK', checkIn: '—', checkOut: '—', hours: '0.0 hrs', email: 'david.kim@dayflow.io', phone: '+1 (555) 678-9012', address: '321 Elm St, Chicago, IL', salary: '$125,000' },
-  { id: 'EMP-006', name: 'Emma Thompson', role: 'QA Lead Engineer', dept: 'Engineering', status: 'half-day', avatar: 'ET', checkIn: '09:10 AM', checkOut: '01:10 PM', hours: '4.0 hrs', email: 'emma.t@dayflow.io', phone: '+1 (555) 789-0123', address: '654 Birch Rd, Denver, CO', salary: '$120,000' },
-  { id: 'EMP-007', name: 'Ryan Garcia', role: 'DevOps & Cloud Engineer', dept: 'Engineering', status: 'present', avatar: 'RG', checkIn: '08:30 AM', checkOut: '05:00 PM', hours: '8.5 hrs', email: 'ryan.g@dayflow.io', phone: '+1 (555) 890-1234', address: '987 Cedar Way, Boston, MA', salary: '$140,000' },
-  { id: 'EMP-008', name: 'Lisa Wang', role: 'Growth Marketing Lead', dept: 'Marketing', status: 'late', avatar: 'LW', checkIn: '10:15 AM', checkOut: '—', hours: '5.2 hrs', email: 'lisa.wang@dayflow.io', phone: '+1 (555) 901-2345', address: '147 Maple Dr, New York, NY', salary: '$128,000' },
-];
-
-const LEAVE_REQUESTS = [
-  { id: 1, employee: 'Alex Morgan', avatar: 'AM', type: 'Casual Leave', from: 'Aug 25', to: 'Aug 26', days: 2, reason: 'Personal work', status: 'pending' },
-  { id: 2, employee: 'David Kim', avatar: 'DK', type: 'Sick Leave', from: 'Aug 22', to: 'Aug 24', days: 3, reason: 'Medical appointment', status: 'pending' },
-  { id: 3, employee: 'Emma Thompson', avatar: 'ET', type: 'Vacation', from: 'Sep 1', to: 'Sep 5', days: 5, reason: 'Family trip', status: 'pending' },
-];
-
-const HR_STATS = [
-  { label: 'Total Employees', value: '50', sub: '+3 this month', icon: <Users size={22} />, color: 'var(--primary-400)' },
-  { label: 'Present Today', value: '42', sub: '84% attendance', icon: <UserCheck size={22} />, color: 'var(--success-400)' },
-  { label: 'Pending Leaves', value: '3', sub: 'needs approval', icon: <FileCheck size={22} />, color: 'var(--warning-400)' },
-  { label: 'Late / Half-Day', value: '3', sub: 'today', icon: <Clock size={22} />, color: 'var(--warning-400)' },
+const HR_NOTIFICATIONS = [
+  { id: 1, title: 'Pending Leave Applications', desc: 'New leave requests require HR review & approval', time: '5 mins ago', unread: true, icon: <FileCheck size={16} />, color: 'var(--warning-400)' },
+  { id: 2, title: 'Employee Profile Updated', desc: 'Alex Morgan updated contact details & profile photo', time: '1 hour ago', unread: true, icon: <UserCheck size={16} />, color: 'var(--success-400)' },
+  { id: 3, title: 'Weekly Attendance Report', desc: 'Company attendance rate is at 92.4% this week', time: '1 day ago', unread: false, icon: <TrendingUp size={16} />, color: 'var(--primary-400)' },
+  { id: 4, title: 'System Backup Complete', desc: 'MySQL database backup saved to cloud storage', time: '2 days ago', unread: false, icon: <CheckCircle2 size={16} />, color: 'var(--accent-400)' },
 ];
 
 export default function HRDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('employees');
+  const [activeTab, setActiveTab] = useState('employees'); // 'employees' | 'attendance' | 'leaves' | 'analytics'
   const [searchQuery, setSearchQuery] = useState('');
   const [attendanceStatusFilter, setAttendanceStatusFilter] = useState('all');
-  const [employees, setEmployees] = useState(INITIAL_EMPLOYEES);
-  const [leaveActions, setLeaveActions] = useState({});
   
+  // Real-time Synced States from Central Store
+  const [employees, setEmployees] = useState(() => getStoredEmployees());
+  const [leaveRequests, setLeaveRequests] = useState(() => getStoredLeaves());
+  
+  // Notification Dropdown State
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState(HR_NOTIFICATIONS);
+
+  // HR Profile Modal State
+  const [isHrProfileOpen, setIsHrProfileOpen] = useState(false);
+  const [hrProfileData, setHrProfileData] = useState({
+    id: 'ADM-001',
+    name: 'Maya Patel',
+    title: 'Head of HR Operations & People Culture',
+    email: 'hr.admin@dayflow.io',
+    phone: '+1 (555) 987-6543',
+    dept: 'Human Resources & People Ops',
+    address: '789 Executive Blvd, Austin, TX 78701',
+    accessLevel: 'Super Admin (Full Access)',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400',
+  });
+
   // Admin Edit Employee State
   const [editingEmp, setEditingEmp] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -48,11 +52,30 @@ export default function HRDashboard() {
   // Admin View Attendance Modal State
   const [viewingAttendanceEmp, setViewingAttendanceEmp] = useState(null);
 
+  // Listen for Real-Time Synchronization Events across Dashboards
+  useEffect(() => {
+    const handleStoreChange = () => {
+      setEmployees(getStoredEmployees());
+      setLeaveRequests(getStoredLeaves());
+    };
+    window.addEventListener('dayflow_store_update', handleStoreChange);
+    return () => window.removeEventListener('dayflow_store_update', handleStoreChange);
+  }, []);
+
+  const pendingCount = leaveRequests.filter(l => l.status === 'pending').length;
+
+  const HR_STATS = [
+    { label: 'Total Employees', value: String(employees.length + 42), sub: '+3 this month', icon: <Users size={22} />, color: 'var(--primary-400)' },
+    { label: 'Present Today', value: '42', sub: '84% attendance', icon: <UserCheck size={22} />, color: 'var(--success-400)' },
+    { label: 'Pending Leaves', value: String(pendingCount), sub: 'needs approval', icon: <FileCheck size={22} />, color: 'var(--warning-400)' },
+    { label: 'Late / Half-Day', value: '3', sub: 'today', icon: <Clock size={22} />, color: 'var(--warning-400)' },
+  ];
+
   const filteredEmployees = employees.filter(emp =>
     emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     emp.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
     emp.dept.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    emp.role.toLowerCase().includes(searchQuery.toLowerCase())
+    (emp.role && emp.role.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const filteredAttendanceEmployees = employees.filter(emp => {
@@ -65,7 +88,9 @@ export default function HRDashboard() {
   });
 
   const handleLeaveAction = (id, action) => {
-    setLeaveActions(prev => ({ ...prev, [id]: action }));
+    updateLeaveStatus(id, action);
+    setSuccessToast(`Leave request ${action === 'approved' ? 'APPROVED' : 'REJECTED'} successfully! Emitted to Employee Dashboard.`);
+    setTimeout(() => setSuccessToast(''), 4000);
   };
 
   const handleOpenEdit = (emp) => {
@@ -75,11 +100,33 @@ export default function HRDashboard() {
 
   const handleSaveEmployee = (e) => {
     e.preventDefault();
-    setEmployees(prev => prev.map(emp => emp.id === editForm.id ? editForm : emp));
+    updateStoredEmployeeProfile(editForm.id, {
+      phone: editForm.phone,
+      address: editForm.address,
+      avatarUrl: editForm.avatarUrl,
+      fullName: editForm.name,
+    });
     setEditingEmp(null);
     setSuccessToast(`Admin updated profile for ${editForm.name} (${editForm.id}) successfully!`);
     setTimeout(() => setSuccessToast(''), 4000);
   };
+
+  const handleHrAvatarUpload = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setHrProfileData(prev => ({ ...prev, avatarUrl: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const markAllNotificationsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
+  };
+
+  const unreadCount = notifications.filter(n => n.unread).length;
 
   const getStatusBadge = (status) => {
     const map = {
@@ -141,14 +188,17 @@ export default function HRDashboard() {
           >
             <div className="sidebar-link-icon"><FileCheck size={20} /></div>
             <span>Leave Approvals</span>
-            <span className="sidebar-link-badge">3</span>
+            {pendingCount > 0 && <span className="sidebar-link-badge">{pendingCount}</span>}
           </button>
 
           <div className="sidebar-section-label" style={{ marginTop: '1.5rem' }}>Reports</div>
-          <a href="#" className="sidebar-link" onClick={(e) => e.preventDefault()}>
+          <button
+            className={`sidebar-link ${activeTab === 'analytics' ? 'sidebar-link-active' : ''}`}
+            onClick={() => { setActiveTab('analytics'); setSidebarOpen(false); }}
+          >
             <div className="sidebar-link-icon"><BarChart3 size={20} /></div>
             <span>Analytics</span>
-          </a>
+          </button>
         </nav>
 
         <div className="sidebar-footer">
@@ -174,13 +224,66 @@ export default function HRDashboard() {
               <p className="topbar-subtitle">Full administrative control over all employees & workforce attendance</p>
             </div>
           </div>
-          <div className="topbar-right">
-            <button className="topbar-icon-btn" aria-label="Notifications">
+          <div className="topbar-right" style={{ position: 'relative' }}>
+            {/* Notification Bell Icon */}
+            <button
+              className="topbar-icon-btn"
+              aria-label="Notifications"
+              onClick={() => setNotificationsOpen(prev => !prev)}
+            >
               <Bell size={20} />
-              <span className="topbar-badge">5</span>
+              {unreadCount > 0 && <span className="topbar-badge">{unreadCount}</span>}
             </button>
-            <div className="topbar-avatar topbar-avatar-hr" title="Logged in as HR Admin">
-              <span>HR</span>
+
+            {/* Notification Dropdown Panel */}
+            {notificationsOpen && (
+              <div className="notifications-dropdown-menu">
+                <div className="notifications-dropdown-header">
+                  <div className="notifications-dropdown-title">
+                    <Bell size={18} style={{ color: 'var(--primary-400)' }} /> HR Alerts & Notifications
+                  </div>
+                  {unreadCount > 0 && (
+                    <button className="btn-ghost-sm" onClick={markAllNotificationsRead} style={{ fontSize: '0.75rem' }}>
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+
+                <div className="notifications-dropdown-body">
+                  {notifications.map((item) => (
+                    <div key={item.id} className={`notification-dropdown-item ${item.unread ? 'unread' : ''}`}>
+                      <div className="notification-dropdown-icon" style={{ background: `${item.color}15`, color: item.color }}>
+                        {item.icon}
+                      </div>
+                      <div>
+                        <div className="notification-dropdown-text">{item.title}</div>
+                        <div className="notification-dropdown-sub">{item.desc}</div>
+                        <div className="notification-dropdown-time">{item.time}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="notifications-dropdown-footer">
+                  <button className="btn-ghost-sm" onClick={() => setNotificationsOpen(false)} style={{ width: '100%', fontSize: '0.8rem' }}>
+                    Close HR Alerts
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* HR Profile Avatar Button */}
+            <div
+              className="topbar-avatar topbar-avatar-hr"
+              onClick={() => setIsHrProfileOpen(true)}
+              title="Click to view HR Admin Profile"
+              style={{ cursor: 'pointer' }}
+            >
+              {hrProfileData.avatarUrl ? (
+                <img src={hrProfileData.avatarUrl} alt="HR Avatar" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+              ) : (
+                <span>HR</span>
+              )}
             </div>
           </div>
         </header>
@@ -213,7 +316,7 @@ export default function HRDashboard() {
           {activeTab === 'employees' && (
             <section className="section" style={{ animation: 'fadeInUp 0.4s ease-out' }}>
               <div className="section-header">
-                <h2 className="section-title">Employee Directory (Admin Control)</h2>
+                <h2 className="section-title">Employee Directory (Admin Control & Real-Time Sync)</h2>
                 <div className="section-actions">
                   <div className="search-bar">
                     <Search size={18} className="search-icon" />
@@ -235,6 +338,7 @@ export default function HRDashboard() {
                       <th>Employee</th>
                       <th>ID</th>
                       <th>Department</th>
+                      <th>Phone & Contact</th>
                       <th>Status</th>
                       <th>Salary / CTC</th>
                       <th>Admin Actions</th>
@@ -245,7 +349,13 @@ export default function HRDashboard() {
                       <tr key={emp.id} className="table-row" style={{ animationDelay: `${i * 0.05}s` }}>
                         <td>
                           <div className="table-user">
-                            <div className="table-avatar">{emp.avatar}</div>
+                            <div className="table-avatar" style={{ overflow: 'hidden', padding: 0 }}>
+                              {emp.avatarUrl ? (
+                                <img src={emp.avatarUrl} alt={emp.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                emp.avatar
+                              )}
+                            </div>
                             <div>
                               <div className="table-user-name">{emp.name}</div>
                               <div className="table-user-role">{emp.role}</div>
@@ -254,6 +364,7 @@ export default function HRDashboard() {
                         </td>
                         <td><span className="table-id">{emp.id}</span></td>
                         <td>{emp.dept}</td>
+                        <td className="table-time" style={{ fontSize: '0.85rem' }}>{emp.phone || 'N/A'}</td>
                         <td>{getStatusBadge(emp.status)}</td>
                         <td className="table-time" style={{ fontWeight: 600, color: 'var(--success-400)' }}>{emp.salary}</td>
                         <td>
@@ -290,7 +401,7 @@ export default function HRDashboard() {
             </section>
           )}
 
-          {/* TAB 2: ALL EMPLOYEE ATTENDANCE VIEW (HR / ADMIN PERMISSION) */}
+          {/* TAB 2: ALL EMPLOYEE ATTENDANCE VIEW */}
           {activeTab === 'attendance' && (
             <section className="section" style={{ animation: 'fadeInUp 0.4s ease-out' }}>
               <div className="section-header">
@@ -323,7 +434,6 @@ export default function HRDashboard() {
                 </div>
               </div>
 
-              {/* Status Types Legend Bar */}
               <div className="status-legend-bar" style={{ marginBottom: '1.25rem' }}>
                 <span style={{ fontWeight: 700, color: 'white', marginRight: '0.5rem' }}>Status Filter Types:</span>
                 <span
@@ -400,14 +510,6 @@ export default function HRDashboard() {
                   </tbody>
                 </table>
               </div>
-
-              {filteredAttendanceEmployees.length === 0 && (
-                <div className="empty-state">
-                  <Search size={40} />
-                  <h3>No matching attendance records</h3>
-                  <p>Try selecting a different status filter</p>
-                </div>
-              )}
             </section>
           )}
 
@@ -415,71 +517,267 @@ export default function HRDashboard() {
           {activeTab === 'leaves' && (
             <section className="section" style={{ animation: 'fadeInUp 0.4s ease-out' }}>
               <div className="section-header">
-                <h2 className="section-title">Leave Approvals</h2>
-                <span className="section-badge">{LEAVE_REQUESTS.filter(l => !leaveActions[l.id]).length} pending</span>
+                <h2 className="section-title">Leave Approvals (Synced with Employee Dashboard)</h2>
+                <span className="section-badge">{pendingCount} pending</span>
               </div>
 
               <div className="leave-cards">
-                {LEAVE_REQUESTS.map((req, i) => {
-                  const action = leaveActions[req.id];
-                  return (
-                    <div
-                      key={req.id}
-                      className={`leave-card ${action ? `leave-card-${action}` : ''}`}
-                      style={{ animationDelay: `${i * 0.1}s` }}
-                    >
-                      <div className="leave-card-top">
-                        <div className="leave-card-user">
-                          <div className="leave-card-avatar">{req.avatar}</div>
-                          <div>
-                            <div className="leave-card-name">{req.employee}</div>
-                            <div className="leave-card-type">{req.type}</div>
-                          </div>
-                        </div>
-                        {action && (
-                          <span className={`status-badge ${action === 'approved' ? 'badge-success' : 'badge-danger'}`}>
-                            {action === 'approved' ? 'Approved' : 'Rejected'}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="leave-card-details">
-                        <div className="leave-detail">
-                          <span className="leave-detail-label">Duration</span>
-                          <span className="leave-detail-value">{req.from} – {req.to} ({req.days} days)</span>
-                        </div>
-                        <div className="leave-detail">
-                          <span className="leave-detail-label">Reason</span>
-                          <span className="leave-detail-value">{req.reason}</span>
+                {leaveRequests.map((req, i) => (
+                  <div
+                    key={req.id}
+                    className={`leave-card ${req.status !== 'pending' ? `leave-card-${req.status}` : ''}`}
+                    style={{ animationDelay: `${i * 0.1}s` }}
+                  >
+                    <div className="leave-card-top">
+                      <div className="leave-card-user">
+                        <div className="leave-card-avatar">{req.avatar || 'EM'}</div>
+                        <div>
+                          <div className="leave-card-name">{req.employee}</div>
+                          <div className="leave-card-type">{req.type}</div>
                         </div>
                       </div>
-
-                      {!action && (
-                        <div className="leave-card-actions">
-                          <button
-                            className="leave-btn leave-btn-approve"
-                            onClick={() => handleLeaveAction(req.id, 'approved')}
-                          >
-                            <Check size={16} />
-                            Approve
-                          </button>
-                          <button
-                            className="leave-btn leave-btn-reject"
-                            onClick={() => handleLeaveAction(req.id, 'rejected')}
-                          >
-                            <XCircle size={16} />
-                            Reject
-                          </button>
-                        </div>
+                      {req.status !== 'pending' && (
+                        <span className={`status-badge ${req.status === 'approved' ? 'badge-success' : 'badge-danger'}`}>
+                          {req.status === 'approved' ? 'Approved' : 'Rejected'}
+                        </span>
                       )}
                     </div>
-                  );
-                })}
+
+                    <div className="leave-card-details">
+                      <div className="leave-detail">
+                        <span className="leave-detail-label">Duration</span>
+                        <span className="leave-detail-value">{req.from || req.fromDate} – {req.to || req.toDate} ({req.days} days)</span>
+                      </div>
+                      <div className="leave-detail">
+                        <span className="leave-detail-label">Reason</span>
+                        <span className="leave-detail-value">{req.reason}</span>
+                      </div>
+                    </div>
+
+                    {req.status === 'pending' && (
+                      <div className="leave-card-actions">
+                        <button
+                          className="leave-btn leave-btn-approve"
+                          onClick={() => handleLeaveAction(req.id, 'approved')}
+                        >
+                          <Check size={16} />
+                          Approve
+                        </button>
+                        <button
+                          className="leave-btn leave-btn-reject"
+                          onClick={() => handleLeaveAction(req.id, 'rejected')}
+                        >
+                          <XCircle size={16} />
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </section>
           )}
+
+          {/* TAB 4: ANALYTICS & INSIGHTS DASHBOARD */}
+          {activeTab === 'analytics' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', animation: 'fadeInUp 0.4s ease-out' }}>
+              <div className="section-header">
+                <h2 className="section-title">Workforce Analytics & Insights</h2>
+              </div>
+
+              {/* Analytics Summary Row */}
+              <div className="stats-grid">
+                <div className="stat-card">
+                  <div className="stat-card-label">Monthly Punctuality</div>
+                  <div className="stat-card-value" style={{ color: 'var(--success-400)' }}>92.4%</div>
+                  <div className="stat-card-sub">On-time check-in rate</div>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-card-label">Avg Daily Work Hours</div>
+                  <div className="stat-card-value" style={{ color: 'var(--primary-400)' }}>8.4 hrs</div>
+                  <div className="stat-card-sub">Across active staff</div>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-card-label">Monthly Payroll Spent</div>
+                  <div className="stat-card-value" style={{ color: 'var(--accent-400)' }}>$578,000</div>
+                  <div className="stat-card-sub">Gross monthly salary budget</div>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-card-label">Leave Utilization</div>
+                  <div className="stat-card-value" style={{ color: 'var(--warning-400)' }}>135 Days</div>
+                  <div className="stat-card-sub">Total leaves taken YTD</div>
+                </div>
+              </div>
+
+              <div className="profile-content-grid">
+                {/* Department Distribution Chart Card */}
+                <div className="profile-card">
+                  <div className="profile-card-header">
+                    <h3 className="profile-card-title"><PieChart className="profile-card-title-icon" size={20} /> Department Headcount Breakdown</h3>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'white', fontWeight: 600 }}>
+                        <span>Engineering & Product (20 staff)</span>
+                        <span>40%</span>
+                      </div>
+                      <div className="analytics-bar-bg">
+                        <div className="analytics-bar-fill" style={{ width: '40%', background: 'var(--primary-400)' }} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'white', fontWeight: 600 }}>
+                        <span>Design & User Experience (10 staff)</span>
+                        <span>20%</span>
+                      </div>
+                      <div className="analytics-bar-bg">
+                        <div className="analytics-bar-fill" style={{ width: '20%', background: 'var(--accent-400)' }} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'white', fontWeight: 600 }}>
+                        <span>Marketing & Growth (8 staff)</span>
+                        <span>16%</span>
+                      </div>
+                      <div className="analytics-bar-bg">
+                        <div className="analytics-bar-fill" style={{ width: '16%', background: 'var(--warning-400)' }} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'white', fontWeight: 600 }}>
+                        <span>Human Resources & Ops (7 staff)</span>
+                        <span>14%</span>
+                      </div>
+                      <div className="analytics-bar-bg">
+                        <div className="analytics-bar-fill" style={{ width: '14%', background: 'var(--success-400)' }} />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', color: 'white', fontWeight: 600 }}>
+                        <span>Data & Analytics (5 staff)</span>
+                        <span>10%</span>
+                      </div>
+                      <div className="analytics-bar-bg">
+                        <div className="analytics-bar-fill" style={{ width: '10%', background: 'var(--secondary-400)' }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Monthly Leave Utilization Chart */}
+                <div className="profile-card">
+                  <div className="profile-card-header">
+                    <h3 className="profile-card-title"><BarChart3 className="profile-card-title-icon" size={20} /> Leave Category Usage</h3>
+                  </div>
+                  <div className="salary-breakdown-list">
+                    <div className="salary-row salary-row-allowance">
+                      <span>Annual Vacation Leaves</span>
+                      <span style={{ fontWeight: 700, color: 'var(--primary-400)' }}>68 Days (50.3%)</span>
+                    </div>
+                    <div className="salary-row salary-row-allowance">
+                      <span>Casual & Personal Leaves</span>
+                      <span style={{ fontWeight: 700, color: 'var(--success-400)' }}>45 Days (33.3%)</span>
+                    </div>
+                    <div className="salary-row salary-row-allowance">
+                      <span>Sick & Medical Leaves</span>
+                      <span style={{ fontWeight: 700, color: 'var(--warning-400)' }}>22 Days (16.4%)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </main>
+
+      {/* HR ADMIN PROFILE MODAL */}
+      {isHrProfileOpen && (
+        <div className="modal-overlay" onClick={() => setIsHrProfileOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">
+                <Shield size={20} style={{ color: 'var(--accent-400)' }} /> HR Administrator Profile
+              </div>
+              <button className="sidebar-close" onClick={() => setIsHrProfileOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ gap: '1.25rem' }}>
+              <div className="form-group" style={{ background: 'rgba(30, 41, 59, 0.5)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--surface-glass-border)' }}>
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'white', fontWeight: 700 }}>
+                  <ImageIcon size={18} style={{ color: 'var(--primary-400)' }} /> HR Admin Photo (Upload from Computer)
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', marginTop: '0.5rem' }}>
+                  <div style={{ width: '60px', height: '60px', borderRadius: '50%', overflow: 'hidden', border: '2px solid var(--accent-400)', background: 'var(--surface-card)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {hrProfileData.avatarUrl ? (
+                      <img src={hrProfileData.avatarUrl} alt="HR Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <User size={28} style={{ color: 'var(--neutral-400)' }} />
+                    )}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="form-input"
+                      onChange={handleHrAvatarUpload}
+                      style={{ cursor: 'pointer', padding: '0.4rem' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="profile-details-grid">
+                <div className="profile-detail-field">
+                  <span className="profile-detail-label">Admin Name</span>
+                  <span className="profile-detail-value">{hrProfileData.name}</span>
+                </div>
+                <div className="profile-detail-field">
+                  <span className="profile-detail-label">Admin ID</span>
+                  <span className="profile-detail-value">{hrProfileData.id}</span>
+                </div>
+                <div className="profile-detail-field">
+                  <span className="profile-detail-label">Official Designation</span>
+                  <span className="profile-detail-value">{hrProfileData.title}</span>
+                </div>
+                <div className="profile-detail-field">
+                  <span className="profile-detail-label">Department</span>
+                  <span className="profile-detail-value">{hrProfileData.dept}</span>
+                </div>
+                <div className="profile-detail-field">
+                  <span className="profile-detail-label">Email Address</span>
+                  <span className="profile-detail-value">{hrProfileData.email}</span>
+                </div>
+                <div className="profile-detail-field">
+                  <span className="profile-detail-label">Phone</span>
+                  <span className="profile-detail-value">{hrProfileData.phone}</span>
+                </div>
+              </div>
+
+              <div className="profile-detail-field" style={{ background: 'rgba(236, 72, 153, 0.1)', padding: '0.85rem', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(236, 72, 153, 0.2)' }}>
+                <span className="profile-detail-label" style={{ color: 'var(--accent-300)' }}>System Access Rights</span>
+                <span className="profile-detail-value" style={{ color: 'white', fontWeight: 700 }}>
+                  🛡️ {hrProfileData.accessLevel}
+                </span>
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-primary" onClick={() => setIsHrProfileOpen(false)}>
+                Close HR Profile
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ADMIN VIEW EMPLOYEE ATTENDANCE MODAL */}
       {viewingAttendanceEmp && (
