@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Zap, User, CalendarCheck, FileText, LogOut,
-  Bell, Clock, CheckCircle2, AlertCircle,
+  Bell, Clock, CheckCircle2, AlertCircle, XCircle,
   TrendingUp, Calendar, ChevronRight, Sun, Menu, X,
   Briefcase, DollarSign, Folder, Camera, Mail, Phone,
   MapPin, ShieldAlert, Award, Download, UploadCloud, Edit3, Check,
-  Lock, Shield, Save, Play, Pause, CalendarRange, ListFilter
+  Shield, Save, Play, Pause, CalendarRange, ListFilter, Image as ImageIcon, Plus
 } from 'lucide-react';
 import { getEmployeeProfile, updateEmployeeProfile } from '../services/employeeService';
 import { MOCK_WEEKLY_ATTENDANCE, MOCK_DAILY_TIMELINE, ATTENDANCE_STATUS_TYPES } from '../services/attendanceService';
@@ -54,15 +54,20 @@ const QUICK_STATS = [
   { label: 'On-Time Rate', value: '95%', sub: 'last 30 days', icon: <TrendingUp size={22} />, color: 'var(--accent-400)' },
 ];
 
+const INITIAL_MY_LEAVES = [
+  { id: 'LV-101', type: 'Casual Leave', fromDate: '2026-08-25', toDate: '2026-08-26', days: 2, reason: 'Personal errands and home maintenance', status: 'approved', appliedDate: 'Aug 20, 2026' },
+  { id: 'LV-102', type: 'Sick Leave', fromDate: '2026-08-10', toDate: '2026-08-10', days: 1, reason: 'High fever and doctor consultation', status: 'approved', appliedDate: 'Aug 09, 2026' },
+  { id: 'LV-103', type: 'Annual Vacation', fromDate: '2026-09-01', toDate: '2026-09-05', days: 5, reason: 'Family trip to national park', status: 'pending', appliedDate: 'Aug 21, 2026' },
+];
+
 export default function EmployeeDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'profile' | 'attendance'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'profile' | 'attendance' | 'leaves'
   const [profileSubTab, setProfileSubTab] = useState('personal'); // 'personal' | 'job' | 'salary' | 'documents'
   const [profileData, setProfileData] = useState(null);
   
-  // Edit Profile & Role Permission States
+  // Edit Profile States
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingRole, setEditingRole] = useState('employee'); // 'employee' | 'admin'
   const [editFormData, setEditFormData] = useState({});
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
 
@@ -74,6 +79,16 @@ export default function EmployeeDashboard() {
   const [workSeconds, setWorkSeconds] = useState(15735); // ~4 hours 22 mins
   const [todayStatus, setTodayStatus] = useState('PRESENT'); // 'PRESENT' | 'HALF_DAY' | 'ABSENT' | 'LEAVE'
   const [weeklyRecords, setWeeklyRecords] = useState(MOCK_WEEKLY_ATTENDANCE);
+
+  // Leave Management States
+  const [myLeaves, setMyLeaves] = useState(INITIAL_MY_LEAVES);
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [newLeaveForm, setNewLeaveForm] = useState({
+    type: 'Casual Leave',
+    fromDate: '',
+    toDate: '',
+    reason: '',
+  });
 
   useEffect(() => {
     getEmployeeProfile().then((data) => {
@@ -105,10 +120,8 @@ export default function EmployeeDashboard() {
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     
     if (isCheckedIn) {
-      // Check Out
       setIsCheckedIn(false);
       setCheckOutTime(timeStr);
-      // Determine status based on logged hours
       const hrsLogged = workSeconds / 3600;
       if (hrsLogged < 4) {
         setTodayStatus('HALF_DAY');
@@ -116,7 +129,6 @@ export default function EmployeeDashboard() {
         setTodayStatus('PRESENT');
       }
     } else {
-      // Check In
       setIsCheckedIn(true);
       setCheckInTime(timeStr);
       setCheckOutTime('—');
@@ -168,17 +180,24 @@ export default function EmployeeDashboard() {
     setEditFormData(prev => ({ ...prev, [field]: val }));
   };
 
+  const handleImageFileUpload = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setEditFormData((prev) => ({ ...prev, avatarUrl: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSaveProfile = (e) => {
     e.preventDefault();
     const updated = {
       ...profileData,
       personalDetails: {
         ...profileData.personalDetails,
-        fullName: editFormData.fullName,
-        email: editFormData.email,
         phone: editFormData.phone,
-        dob: editFormData.dob,
-        gender: editFormData.gender,
         address: editFormData.address,
         avatarUrl: editFormData.avatarUrl,
         emergencyContact: {
@@ -187,32 +206,44 @@ export default function EmployeeDashboard() {
           phone: editFormData.emergencyPhone,
         },
       },
-      jobDetails: {
-        ...profileData.jobDetails,
-        designation: editFormData.designation,
-        department: editFormData.department,
-        employeeType: editFormData.employeeType,
-        dateOfJoining: editFormData.dateOfJoining,
-        workLocation: editFormData.workLocation,
-        manager: editFormData.manager,
-        status: editFormData.status,
-      },
-      salaryStructure: {
-        ...profileData.salaryStructure,
-        annualPackage: editFormData.annualPackage,
-        netMonthlyPay: editFormData.netMonthlyPay,
-        monthlyBase: editFormData.monthlyBase,
-        hra: editFormData.hra,
-        specialAllowance: editFormData.specialAllowance,
-      },
     };
 
     setProfileData(updated);
     updateEmployeeProfile(updated);
     setIsEditModalOpen(false);
     
-    const roleText = editingRole === 'admin' ? 'Admin / HR' : 'Employee';
-    setSaveSuccessMsg(`Profile updated successfully as ${roleText}!`);
+    setSaveSuccessMsg('Your profile details & picture have been updated successfully!');
+    setTimeout(() => setSaveSuccessMsg(''), 4000);
+  };
+
+  const handleApplyLeaveSubmit = (e) => {
+    e.preventDefault();
+    if (!newLeaveForm.fromDate || !newLeaveForm.toDate) {
+      alert('Please select both From Date and To Date');
+      return;
+    }
+
+    const d1 = new Date(newLeaveForm.fromDate);
+    const d2 = new Date(newLeaveForm.toDate);
+    const diffTime = Math.abs(d2 - d1);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    const newLeaveObj = {
+      id: `LV-${Math.floor(100 + Math.random() * 900)}`,
+      type: newLeaveForm.type,
+      fromDate: newLeaveForm.fromDate,
+      toDate: newLeaveForm.toDate,
+      days: isNaN(diffDays) ? 1 : diffDays,
+      reason: newLeaveForm.reason || 'Personal leave request',
+      status: 'pending',
+      appliedDate: 'Just Now',
+    };
+
+    setMyLeaves(prev => [newLeaveObj, ...prev]);
+    setIsLeaveModalOpen(false);
+    setNewLeaveForm({ type: 'Casual Leave', fromDate: '', toDate: '', reason: '' });
+    
+    setSaveSuccessMsg(`Leave request (${newLeaveForm.type}) submitted successfully for HR approval!`);
     setTimeout(() => setSaveSuccessMsg(''), 4000);
   };
 
@@ -232,6 +263,16 @@ export default function EmployeeDashboard() {
         {config.label}
       </span>
     );
+  };
+
+  const getLeaveStatusChip = (status) => {
+    if (status === 'approved') {
+      return <span className="weekly-status-chip" style={{ color: 'var(--success-400)', background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)' }}>Approved</span>;
+    }
+    if (status === 'rejected') {
+      return <span className="weekly-status-chip" style={{ color: 'var(--danger-400)', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)' }}>Rejected</span>;
+    }
+    return <span className="weekly-status-chip" style={{ color: 'var(--warning-400)', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid rgba(245, 158, 11, 0.3)' }}>Pending HR Review</span>;
   };
 
   return (
@@ -279,10 +320,14 @@ export default function EmployeeDashboard() {
             <span>Attendance</span>
           </button>
 
-          <a href="#" className="sidebar-link" onClick={(e) => e.preventDefault()}>
+          <button
+            onClick={() => { setActiveTab('leaves'); setSidebarOpen(false); }}
+            className={`sidebar-link ${activeTab === 'leaves' ? 'sidebar-link-active' : ''}`}
+            style={{ width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer' }}
+          >
             <div className="sidebar-link-icon"><FileText size={20} /></div>
             <span>Leave Requests</span>
-          </a>
+          </button>
         </nav>
 
         <div className="sidebar-footer">
@@ -309,11 +354,13 @@ export default function EmployeeDashboard() {
                 {activeTab === 'dashboard' && <>{getGreeting()}, <span className="gradient-text">{personal.fullName ? personal.fullName.split(' ')[0] : 'Alex'}</span></>}
                 {activeTab === 'profile' && <>Employee <span className="gradient-text">Profile</span></>}
                 {activeTab === 'attendance' && <>Attendance <span className="gradient-text">Tracking</span></>}
+                {activeTab === 'leaves' && <>Leave <span className="gradient-text">Management</span></>}
               </h1>
               <p className="topbar-subtitle">
                 {activeTab === 'dashboard' && "Here's your daily overview"}
                 {activeTab === 'profile' && 'Manage your personal details, job role, salary & documents'}
                 {activeTab === 'attendance' && 'Live check-in/out, daily timeline logs & weekly views'}
+                {activeTab === 'leaves' && 'Apply for leave, check available balances & view status'}
               </p>
             </div>
           </div>
@@ -339,6 +386,12 @@ export default function EmployeeDashboard() {
 
         {/* Content Body */}
         <div className="dashboard-content">
+          {saveSuccessMsg && (
+            <div className="status-badge status-approved" style={{ padding: '0.85rem 1.25rem', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.95rem', marginBottom: '1.25rem' }}>
+              <Check size={18} /> {saveSuccessMsg}
+            </div>
+          )}
+
           {/* TAB 1: OVERVIEW DASHBOARD */}
           {activeTab === 'dashboard' && (
             <>
@@ -369,7 +422,7 @@ export default function EmployeeDashboard() {
                       <User size={28} />
                     </div>
                     <h3 className="quick-card-title">My Profile</h3>
-                    <p className="quick-card-desc">View and edit your personal, job, salary details & documents</p>
+                    <p className="quick-card-desc">View and edit your personal details & profile photo</p>
                     <button className="quick-card-btn">
                       Open Profile <ChevronRight size={16} />
                     </button>
@@ -387,7 +440,7 @@ export default function EmployeeDashboard() {
                     </button>
                   </div>
 
-                  <div className="quick-card quick-card-leave">
+                  <div className="quick-card quick-card-leave" onClick={() => setActiveTab('leaves')} style={{ cursor: 'pointer' }}>
                     <div className="quick-card-glow" />
                     <div className="quick-card-icon">
                       <FileText size={28} />
@@ -428,12 +481,6 @@ export default function EmployeeDashboard() {
           {/* TAB 2: VIEW PROFILE DASHBOARD */}
           {activeTab === 'profile' && (
             <div className="profile-container">
-              {saveSuccessMsg && (
-                <div className="status-badge status-approved" style={{ padding: '0.85rem 1.25rem', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.95rem' }}>
-                  <Check size={18} /> {saveSuccessMsg}
-                </div>
-              )}
-
               {/* Profile Header Banner */}
               <div className="profile-header-card">
                 <div className="profile-cover-banner">
@@ -450,7 +497,7 @@ export default function EmployeeDashboard() {
                       <button
                         className="profile-avatar-edit-btn"
                         onClick={handleOpenEditModal}
-                        title="Update Profile Picture"
+                        title="Upload Photo from Device"
                       >
                         <Camera size={16} />
                       </button>
@@ -581,7 +628,6 @@ export default function EmployeeDashboard() {
                   <div className="profile-card">
                     <div className="profile-card-header">
                       <h3 className="profile-card-title"><Briefcase className="profile-card-title-icon" size={20} /> Position & Department</h3>
-                      <button className="btn-ghost-sm" onClick={handleOpenEditModal} title="Switch to Admin mode to edit"><Lock size={14} /> Admin Edit</button>
                     </div>
                     <div className="profile-details-grid">
                       <div className="profile-detail-field">
@@ -897,55 +943,217 @@ export default function EmployeeDashboard() {
               )}
             </div>
           )}
+
+          {/* TAB 4: LEAVE REQUESTS MANAGEMENT DASHBOARD */}
+          {activeTab === 'leaves' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', animation: 'fadeIn 0.4s ease-out' }}>
+              {/* Leave Balances Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                <div className="stat-card">
+                  <div className="stat-card-header">
+                    <div className="stat-card-icon" style={{ color: 'var(--success-400)', background: 'rgba(16, 185, 129, 0.15)' }}>
+                      <Calendar size={22} />
+                    </div>
+                  </div>
+                  <div className="stat-card-value">8 Days</div>
+                  <div className="stat-card-label">Casual Leave Balance</div>
+                  <div className="stat-card-sub">4 days used of 12 annual</div>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-card-header">
+                    <div className="stat-card-icon" style={{ color: 'var(--warning-400)', background: 'rgba(245, 158, 11, 0.15)' }}>
+                      <Clock size={22} />
+                    </div>
+                  </div>
+                  <div className="stat-card-value">6 Days</div>
+                  <div className="stat-card-label">Sick Leave Balance</div>
+                  <div className="stat-card-sub">4 days used of 10 annual</div>
+                </div>
+
+                <div className="stat-card">
+                  <div className="stat-card-header">
+                    <div className="stat-card-icon" style={{ color: 'var(--primary-400)', background: 'rgba(99, 102, 241, 0.15)' }}>
+                      <Sun size={22} />
+                    </div>
+                  </div>
+                  <div className="stat-card-value">10 Days</div>
+                  <div className="stat-card-label">Annual Vacation</div>
+                  <div className="stat-card-sub">5 days used of 15 annual</div>
+                </div>
+              </div>
+
+              {/* Action Bar */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                <h2 className="section-title">My Submitted Leave Applications</h2>
+                <button className="btn-primary" onClick={() => setIsLeaveModalOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Plus size={18} /> Apply for New Leave
+                </button>
+              </div>
+
+              {/* Leave Requests History Table */}
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Leave Type</th>
+                      <th>Duration / Dates</th>
+                      <th>Days</th>
+                      <th>Reason</th>
+                      <th>Applied On</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myLeaves.map((leave) => (
+                      <tr key={leave.id} className="table-row">
+                        <td style={{ fontWeight: 700, color: 'white' }}>{leave.type}</td>
+                        <td className="table-date">{leave.fromDate} to {leave.toDate}</td>
+                        <td style={{ fontWeight: 600, color: 'var(--primary-400)' }}>{leave.days} day(s)</td>
+                        <td style={{ color: 'var(--neutral-300)', fontSize: '0.88rem' }}>{leave.reason}</td>
+                        <td className="table-time">{leave.appliedDate}</td>
+                        <td>{getLeaveStatusChip(leave.status)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
-      {/* EDIT PROFILE MODAL */}
+      {/* APPLY FOR LEAVE MODAL */}
+      {isLeaveModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsLeaveModalOpen(false)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">
+                <FileText size={20} style={{ color: 'var(--primary-400)' }} /> Apply for New Leave
+              </div>
+              <button className="sidebar-close" onClick={() => setIsLeaveModalOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleApplyLeaveSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              <div className="modal-body">
+                <div className="form-grid">
+                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <label className="form-label">Leave Type</label>
+                    <select
+                      className="form-input"
+                      value={newLeaveForm.type}
+                      onChange={(e) => setNewLeaveForm({ ...newLeaveForm, type: e.target.value })}
+                      style={{ background: 'var(--surface-card)', color: 'white' }}
+                    >
+                      <option value="Casual Leave">Casual Leave (8 days remaining)</option>
+                      <option value="Sick Leave">Sick Leave (6 days remaining)</option>
+                      <option value="Annual Vacation">Annual Vacation (10 days remaining)</option>
+                      <option value="Unpaid Leave">Unpaid Leave</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">From Date</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={newLeaveForm.fromDate}
+                      onChange={(e) => setNewLeaveForm({ ...newLeaveForm, fromDate: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">To Date</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={newLeaveForm.toDate}
+                      onChange={(e) => setNewLeaveForm({ ...newLeaveForm, toDate: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <label className="form-label">Reason for Leave</label>
+                    <textarea
+                      className="form-input"
+                      rows="3"
+                      placeholder="Please enter a brief reason for your leave request..."
+                      value={newLeaveForm.reason}
+                      onChange={(e) => setNewLeaveForm({ ...newLeaveForm, reason: e.target.value })}
+                      required
+                      style={{ resize: 'vertical' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn-ghost-sm" onClick={() => setIsLeaveModalOpen(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Plus size={16} /> Submit Leave Request
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT PROFILE MODAL (EMPLOYEE SELF-SERVICE) */}
       {isEditModalOpen && (
         <div className="modal-overlay" onClick={() => setIsEditModalOpen(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title">
-                <Edit3 size={20} style={{ color: 'var(--primary-400)' }} /> Edit Employee Profile
+                <Edit3 size={20} style={{ color: 'var(--primary-400)' }} /> Edit My Profile Details
               </div>
               <button className="sidebar-close" onClick={() => setIsEditModalOpen(false)}>
                 <X size={20} />
               </button>
             </div>
 
-            <div className="role-switcher-banner">
-              <div className="role-switcher-title">
-                Editing Permissions Mode: <strong>{editingRole === 'employee' ? 'Standard Employee (Limited Fields)' : 'Admin / HR (All Fields Editable)'}</strong>
-              </div>
-              <div className="role-switcher-btns">
-                <button
-                  type="button"
-                  className={`role-btn ${editingRole === 'employee' ? 'active-employee' : ''}`}
-                  onClick={() => setEditingRole('employee')}
-                >
-                  <User size={14} /> Employee Mode
-                </button>
-                <button
-                  type="button"
-                  className={`role-btn ${editingRole === 'admin' ? 'active-admin' : ''}`}
-                  onClick={() => setEditingRole('admin')}
-                >
-                  <Shield size={14} /> Admin Mode
-                </button>
-              </div>
-            </div>
-
             <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div className="modal-body">
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary-400)', borderBottom: '1px solid var(--surface-glass-border)', paddingBottom: '0.4rem' }}>
-                  Personal Information
+                {/* Profile Photo File Upload */}
+                <div className="form-group" style={{ gridColumn: '1 / -1', background: 'rgba(30, 41, 59, 0.5)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--surface-glass-border)' }}>
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'white', fontWeight: 700 }}>
+                    <ImageIcon size={18} style={{ color: 'var(--primary-400)' }} /> Select Profile Photo from Folders
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem', marginTop: '0.5rem' }}>
+                    <div style={{ width: '60px', height: '60px', borderRadius: '50%', overflow: 'hidden', border: '2px solid var(--primary-400)', background: 'var(--surface-card)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {editFormData.avatarUrl ? (
+                        <img src={editFormData.avatarUrl} alt="Avatar Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <User size={28} style={{ color: 'var(--neutral-400)' }} />
+                      )}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="form-input"
+                        onChange={handleImageFileUpload}
+                        style={{ cursor: 'pointer', padding: '0.4rem' }}
+                      />
+                      <span style={{ fontSize: '0.75rem', color: 'var(--neutral-400)', marginTop: '0.25rem', display: 'block' }}>
+                        Supports JPG, PNG, WEBP from your local computer files.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary-400)', borderBottom: '1px solid var(--surface-glass-border)', paddingBottom: '0.4rem', marginTop: '0.5rem' }}>
+                  Editable Personal Contact Details
                 </h4>
+
                 <div className="form-grid">
                   <div className="form-group">
-                    <label className="form-label">
-                      Phone Number
-                      {editingRole === 'employee' && <span style={{ color: 'var(--success-400)', fontSize: '0.7rem' }}>Editable</span>}
-                    </label>
+                    <label className="form-label">Phone Number</label>
                     <input
                       type="text"
                       className="form-input"
@@ -955,24 +1163,17 @@ export default function EmployeeDashboard() {
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">
-                      Profile Picture URL
-                      {editingRole === 'employee' && <span style={{ color: 'var(--success-400)', fontSize: '0.7rem' }}>Editable</span>}
-                    </label>
+                    <label className="form-label">Emergency Contact Name</label>
                     <input
-                      type="url"
+                      type="text"
                       className="form-input"
-                      value={editFormData.avatarUrl}
-                      onChange={(e) => handleInputChange('avatarUrl', e.target.value)}
-                      placeholder="https://..."
+                      value={editFormData.emergencyName}
+                      onChange={(e) => handleInputChange('emergencyName', e.target.value)}
                     />
                   </div>
 
                   <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                    <label className="form-label">
-                      Residential Address
-                      {editingRole === 'employee' && <span style={{ color: 'var(--success-400)', fontSize: '0.7rem' }}>Editable</span>}
-                    </label>
+                    <label className="form-label">Residential Address</label>
                     <input
                       type="text"
                       className="form-input"
@@ -980,32 +1181,30 @@ export default function EmployeeDashboard() {
                       onChange={(e) => handleInputChange('address', e.target.value)}
                     />
                   </div>
+                </div>
 
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--neutral-400)', borderBottom: '1px solid var(--surface-glass-border)', paddingBottom: '0.4rem', marginTop: '1rem' }}>
+                  Official Job & System Information (Read-Only)
+                </h4>
+
+                <div className="form-grid">
                   <div className="form-group">
-                    <label className="form-label">
-                      Full Name
-                      {editingRole === 'employee' && <span className="locked-indicator"><Lock size={11} /> Admin Only</span>}
-                    </label>
+                    <label className="form-label">Full Name</label>
                     <input
                       type="text"
                       className="form-input"
                       value={editFormData.fullName}
-                      onChange={(e) => handleInputChange('fullName', e.target.value)}
-                      disabled={editingRole === 'employee'}
+                      disabled
                     />
                   </div>
 
                   <div className="form-group">
-                    <label className="form-label">
-                      Email Address
-                      {editingRole === 'employee' && <span className="locked-indicator"><Lock size={11} /> Admin Only</span>}
-                    </label>
+                    <label className="form-label">Email Address</label>
                     <input
                       type="email"
                       className="form-input"
                       value={editFormData.email}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
-                      disabled={editingRole === 'employee'}
+                      disabled
                     />
                   </div>
                 </div>
@@ -1016,7 +1215,7 @@ export default function EmployeeDashboard() {
                   Cancel
                 </button>
                 <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Save size={16} /> Save Changes
+                  <Save size={16} /> Save Profile Changes
                 </button>
               </div>
             </form>
