@@ -4,19 +4,19 @@ import {
   Zap, Users, CalendarCheck, FileCheck, LogOut,
   Bell, Clock, CheckCircle2, XCircle, AlertCircle,
   TrendingUp, Search, ChevronRight, BarChart3, UserCheck,
-  Settings, Menu, X, ChevronDown, Check, ArrowUpDown
+  Settings, Menu, X, ChevronDown, Check, ArrowUpDown, Edit3, Save, Shield
 } from 'lucide-react';
 import './Dashboard.css';
 
-const EMPLOYEES = [
-  { id: 'EMP-001', name: 'Alex Morgan', role: 'Frontend Developer', dept: 'Engineering', status: 'present', avatar: 'AM', checkIn: '9:02 AM' },
-  { id: 'EMP-002', name: 'Sarah Chen', role: 'Product Designer', dept: 'Design', status: 'present', avatar: 'SC', checkIn: '8:55 AM' },
-  { id: 'EMP-003', name: 'James Wilson', role: 'Backend Developer', dept: 'Engineering', status: 'absent', avatar: 'JW', checkIn: '—' },
-  { id: 'EMP-004', name: 'Maya Patel', role: 'HR Manager', dept: 'Human Resources', status: 'present', avatar: 'MP', checkIn: '8:48 AM' },
-  { id: 'EMP-005', name: 'David Kim', role: 'Data Analyst', dept: 'Analytics', status: 'on-leave', avatar: 'DK', checkIn: '—' },
-  { id: 'EMP-006', name: 'Emma Thompson', role: 'QA Engineer', dept: 'Engineering', status: 'present', avatar: 'ET', checkIn: '9:10 AM' },
-  { id: 'EMP-007', name: 'Ryan Garcia', role: 'DevOps Engineer', dept: 'Engineering', status: 'present', avatar: 'RG', checkIn: '8:30 AM' },
-  { id: 'EMP-008', name: 'Lisa Wang', role: 'Marketing Lead', dept: 'Marketing', status: 'late', avatar: 'LW', checkIn: '10:15 AM' },
+const INITIAL_EMPLOYEES = [
+  { id: 'EMP-001', name: 'Alex Morgan', role: 'Senior Frontend Developer', dept: 'Engineering', status: 'present', avatar: 'AM', checkIn: '9:02 AM', email: 'alex.morgan@dayflow.io', phone: '+1 (555) 234-5678', address: '742 Evergreen Terrace, Springfield, OR', salary: '$145,000' },
+  { id: 'EMP-002', name: 'Sarah Chen', role: 'Lead Product Designer', dept: 'Design', status: 'present', avatar: 'SC', checkIn: '8:55 AM', email: 'sarah.chen@dayflow.io', phone: '+1 (555) 345-6789', address: '120 Market St, San Francisco, CA', salary: '$150,000' },
+  { id: 'EMP-003', name: 'James Wilson', role: 'Backend Software Engineer', dept: 'Engineering', status: 'absent', avatar: 'JW', checkIn: '—', email: 'james.wilson@dayflow.io', phone: '+1 (555) 456-7890', address: '456 Oak Lane, Seattle, WA', salary: '$135,000' },
+  { id: 'EMP-004', name: 'Maya Patel', role: 'HR Operations Manager', dept: 'Human Resources', status: 'present', avatar: 'MP', checkIn: '8:48 AM', email: 'maya.patel@dayflow.io', phone: '+1 (555) 567-8901', address: '789 Pine Ave, Austin, TX', salary: '$130,000' },
+  { id: 'EMP-005', name: 'David Kim', role: 'Senior Data Analyst', dept: 'Analytics', status: 'on-leave', avatar: 'DK', checkIn: '—', email: 'david.kim@dayflow.io', phone: '+1 (555) 678-9012', address: '321 Elm St, Chicago, IL', salary: '$125,000' },
+  { id: 'EMP-006', name: 'Emma Thompson', role: 'QA Lead Engineer', dept: 'Engineering', status: 'present', avatar: 'ET', checkIn: '9:10 AM', email: 'emma.t@dayflow.io', phone: '+1 (555) 789-0123', address: '654 Birch Rd, Denver, CO', salary: '$120,000' },
+  { id: 'EMP-007', name: 'Ryan Garcia', role: 'DevOps & Cloud Engineer', dept: 'Engineering', status: 'present', avatar: 'RG', checkIn: '8:30 AM', email: 'ryan.g@dayflow.io', phone: '+1 (555) 890-1234', address: '987 Cedar Way, Boston, MA', salary: '$140,000' },
+  { id: 'EMP-008', name: 'Lisa Wang', role: 'Growth Marketing Lead', dept: 'Marketing', status: 'late', avatar: 'LW', checkIn: '10:15 AM', email: 'lisa.wang@dayflow.io', phone: '+1 (555) 901-2345', address: '147 Maple Dr, New York, NY', salary: '$128,000' },
 ];
 
 const LEAVE_REQUESTS = [
@@ -43,17 +43,36 @@ export default function HRDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('employees');
   const [searchQuery, setSearchQuery] = useState('');
+  const [employees, setEmployees] = useState(INITIAL_EMPLOYEES);
   const [leaveActions, setLeaveActions] = useState({});
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  
+  // Admin Edit Employee State
+  const [editingEmp, setEditingEmp] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [successToast, setSuccessToast] = useState('');
 
-  const filteredEmployees = EMPLOYEES.filter(emp =>
+  const filteredEmployees = employees.filter(emp =>
     emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     emp.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    emp.dept.toLowerCase().includes(searchQuery.toLowerCase())
+    emp.dept.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    emp.role.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleLeaveAction = (id, action) => {
     setLeaveActions(prev => ({ ...prev, [id]: action }));
+  };
+
+  const handleOpenEdit = (emp) => {
+    setEditingEmp(emp);
+    setEditForm({ ...emp });
+  };
+
+  const handleSaveEmployee = (e) => {
+    e.preventDefault();
+    setEmployees(prev => prev.map(emp => emp.id === editForm.id ? editForm : emp));
+    setEditingEmp(null);
+    setSuccessToast(`Admin updated profile for ${editForm.name} (${editForm.id}) successfully!`);
+    setTimeout(() => setSuccessToast(''), 4000);
   };
 
   const getStatusBadge = (status) => {
@@ -84,8 +103,8 @@ export default function HRDashboard() {
         </div>
 
         <div className="sidebar-role-badge">
-          <Settings size={14} />
-          <span>HR Admin</span>
+          <Shield size={14} />
+          <span>HR Admin Mode</span>
         </div>
 
         <nav className="sidebar-nav">
@@ -95,7 +114,7 @@ export default function HRDashboard() {
             onClick={() => { setActiveTab('employees'); setSidebarOpen(false); }}
           >
             <div className="sidebar-link-icon"><Users size={20} /></div>
-            <span>Employee List</span>
+            <span>Employee Directory</span>
           </button>
           <button
             className={`sidebar-link ${activeTab === 'attendance' ? 'sidebar-link-active' : ''}`}
@@ -114,7 +133,7 @@ export default function HRDashboard() {
           </button>
 
           <div className="sidebar-section-label" style={{ marginTop: '1.5rem' }}>Reports</div>
-          <a href="#" className="sidebar-link">
+          <a href="#" className="sidebar-link" onClick={(e) => e.preventDefault()}>
             <div className="sidebar-link-icon"><BarChart3 size={20} /></div>
             <span>Analytics</span>
           </a>
@@ -139,8 +158,8 @@ export default function HRDashboard() {
               <Menu size={22} />
             </button>
             <div className="topbar-greeting">
-              <h1 className="topbar-title">HR <span className="gradient-text">Dashboard</span></h1>
-              <p className="topbar-subtitle">Manage your workforce efficiently</p>
+              <h1 className="topbar-title">HR <span className="gradient-text">Admin Dashboard</span></h1>
+              <p className="topbar-subtitle">Full administrative control over employee profiles & workforce</p>
             </div>
           </div>
           <div className="topbar-right">
@@ -148,13 +167,19 @@ export default function HRDashboard() {
               <Bell size={20} />
               <span className="topbar-badge">5</span>
             </button>
-            <div className="topbar-avatar topbar-avatar-hr">
+            <div className="topbar-avatar topbar-avatar-hr" title="Logged in as HR Admin">
               <span>HR</span>
             </div>
           </div>
         </header>
 
         <div className="dashboard-content">
+          {successToast && (
+            <div className="status-badge status-approved" style={{ padding: '0.85rem 1.25rem', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.95rem', marginBottom: '1.25rem' }}>
+              <Check size={18} /> {successToast}
+            </div>
+          )}
+
           {/* Stats */}
           <section className="stats-grid">
             {HR_STATS.map((stat, i) => (
@@ -176,7 +201,7 @@ export default function HRDashboard() {
           {activeTab === 'employees' && (
             <section className="section" style={{ animation: 'fadeInUp 0.4s ease-out' }}>
               <div className="section-header">
-                <h2 className="section-title">Employee Directory</h2>
+                <h2 className="section-title">Employee Directory (Admin Edit Enabled)</h2>
                 <div className="section-actions">
                   <div className="search-bar">
                     <Search size={18} className="search-icon" />
@@ -199,8 +224,8 @@ export default function HRDashboard() {
                       <th>ID</th>
                       <th>Department</th>
                       <th>Status</th>
-                      <th>Check-In</th>
-                      <th>Action</th>
+                      <th>Salary / CTC</th>
+                      <th>Admin Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -218,14 +243,17 @@ export default function HRDashboard() {
                         <td><span className="table-id">{emp.id}</span></td>
                         <td>{emp.dept}</td>
                         <td>{getStatusBadge(emp.status)}</td>
-                        <td className="table-time">{emp.checkIn}</td>
+                        <td className="table-time" style={{ fontWeight: 600, color: 'var(--success-400)' }}>{emp.salary}</td>
                         <td>
-                          <button
-                            className="btn-table-action"
-                            onClick={() => setSelectedEmployee(selectedEmployee === emp.id ? null : emp.id)}
-                          >
-                            View <ChevronRight size={14} />
-                          </button>
+                          <div style={{ display: 'flex', gap: '0.4rem' }}>
+                            <button
+                              className="btn-primary"
+                              style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                              onClick={() => handleOpenEdit(emp)}
+                            >
+                              <Edit3 size={14} /> Edit All Details
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -294,34 +322,6 @@ export default function HRDashboard() {
                     ))}
                   </tbody>
                 </table>
-              </div>
-
-              {/* Attendance summary cards */}
-              <div className="attendance-summary-grid">
-                <div className="attendance-summary-card">
-                  <div className="asc-header">
-                    <span className="asc-dot" style={{ background: 'var(--success-400)' }} />
-                    <span className="asc-label">Average Attendance</span>
-                  </div>
-                  <div className="asc-value">86.5%</div>
-                  <div className="asc-sub">Past 30 days</div>
-                </div>
-                <div className="attendance-summary-card">
-                  <div className="asc-header">
-                    <span className="asc-dot" style={{ background: 'var(--warning-400)' }} />
-                    <span className="asc-label">Late Arrivals</span>
-                  </div>
-                  <div className="asc-value">5</div>
-                  <div className="asc-sub">This week</div>
-                </div>
-                <div className="attendance-summary-card">
-                  <div className="asc-header">
-                    <span className="asc-dot" style={{ background: 'var(--primary-400)' }} />
-                    <span className="asc-label">Total On Leave</span>
-                  </div>
-                  <div className="asc-value">11</div>
-                  <div className="asc-sub">This month</div>
-                </div>
               </div>
             </section>
           )}
@@ -394,6 +394,151 @@ export default function HRDashboard() {
           )}
         </div>
       </main>
+
+      {/* ADMIN EDIT ALL EMPLOYEE DETAILS MODAL */}
+      {editingEmp && (
+        <div className="modal-overlay" onClick={() => setEditingEmp(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title">
+                <Shield size={20} style={{ color: 'var(--accent-400)' }} /> Admin Edit Employee Profile ({editForm.id})
+              </div>
+              <button className="sidebar-close" onClick={() => setEditingEmp(null)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="role-switcher-banner" style={{ background: 'rgba(236, 72, 153, 0.1)', borderColor: 'rgba(236, 72, 153, 0.2)' }}>
+              <div className="role-switcher-title" style={{ color: 'var(--accent-300)' }}>
+                👑 <strong>Admin Mode Active</strong>: You have full permission to edit all personal, job, role, and salary details for this employee.
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveEmployee} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              <div className="modal-body">
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary-400)', borderBottom: '1px solid var(--surface-glass-border)', paddingBottom: '0.4rem' }}>
+                  Personal Information
+                </h4>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Full Name</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Employee ID</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editForm.id}
+                      onChange={(e) => setEditForm({ ...editForm, id: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Email Address</label>
+                    <input
+                      type="email"
+                      className="form-input"
+                      value={editForm.email}
+                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Phone Number</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editForm.phone}
+                      onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                    <label className="form-label">Residential Address</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editForm.address}
+                      onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary-400)', borderBottom: '1px solid var(--surface-glass-border)', paddingBottom: '0.4rem', marginTop: '0.5rem' }}>
+                  Job Role & Department
+                </h4>
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">Job Designation / Role</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editForm.role}
+                      onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Department</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editForm.dept}
+                      onChange={(e) => setEditForm({ ...editForm, dept: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Attendance Status</label>
+                    <select
+                      className="form-input"
+                      value={editForm.status}
+                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                      style={{ color: 'white', background: 'var(--surface-card)' }}
+                    >
+                      <option value="present">Present</option>
+                      <option value="absent">Absent</option>
+                      <option value="on-leave">On Leave</option>
+                      <option value="late">Late</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Salary Package / CTC</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editForm.salary}
+                      onChange={(e) => setEditForm({ ...editForm, salary: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn-ghost-sm" onClick={() => setEditingEmp(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Save size={16} /> Save Admin Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
