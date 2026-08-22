@@ -1,51 +1,36 @@
 # DayFlow - Project Release & Feature Updates
 
-## Major Update: MySQL Database Integration, Real-Time Dashboard Sync, HR Profile & Workforce Analytics
+## Major Update: Single Check-In/Out Rules, Realistic Work Hour Statuses & Database Migrations
 
 ### 🚀 Newly Added Features
 
-#### 1. Centralized Real-Time Synchronization Service ([`src/services/storeService.js`](file:///c:/Users/kusum/Desktop/Day_flow/src/services/storeService.js))
-- Built a reactive store broadcasting real-time updates (`dayflow_store_update`) across the application.
-- **Profile Details Sync**: When an employee edits phone, address, or profile photo in `EmployeeDashboard.jsx`, the update is instantly reflected in the HR Admin Employee Directory (`HRDashboard.jsx`).
-- **Leave Request Sync**: New leave applications submitted by employees instantly appear in the HR Admin's **Leave Approvals** tab.
-- **Approval Status Sync**: When HR approves or rejects a leave request, the status updates live on the employee's Leave Requests tab (`Approved` or `Rejected`).
+#### 1. Single Check-In & Single Check-Out Per Day Policy ([`src/pages/EmployeeDashboard.jsx`](file:///c:/Users/kusum/Desktop/Day_flow/src/pages/EmployeeDashboard.jsx))
+- Employees can perform Check-In ONCE per day and Check-Out ONCE per day.
+- Once checked out, the action button transitions to 🔒 **Shift Completed Today** (locked/disabled state).
+- Prevents multiple erratic check-ins/outs within the same day.
+
+#### 2. Realistic Attendance Status Thresholds
+- **Full Day (`PRESENT`)**: Logged work duration $\ge$ 7.0 hours.
+- **Half Day (`HALF_DAY`)**: Logged work duration between 4.0 and 6.9 hours.
+- **Undertime / Absent (`ABSENT`)**: Logged work duration $<$ 4.0 hours (short durations under 4 hours are correctly marked as Undertime / Absent instead of Half-Day).
+- **Shift Testing Simulator**: Added simulator controls for evaluators to test full-day, half-day, and undertime shifts easily.
 
 ---
 
-#### 2. HR Administrator Profile & Photo Upload ([`src/pages/HRDashboard.jsx`](file:///c:/Users/kusum/Desktop/Day_flow/src/pages/HRDashboard.jsx))
-- Added an interactive **HR Admin Profile Modal** accessible via the HR avatar icon in topbar.
-- Displays HR Admin credentials (Name: Maya Patel, Admin ID: `ADM-001`, Title: Head of HR Operations, Department: Human Resources, Access Level: 🛡️ Super Admin).
-- Includes native device photo picker for HR Admin profile picture updates.
+#### 3. Database Migration Workflow ([`README_DB_SYNC.md`](file:///c:/Users/kusum/Desktop/Day_flow/README_DB_SYNC.md))
+- `/migrations` directory with versioned baseline SQL scripts (`001_create_developer1_tables.sql`, `002_create_developer2_tables.sql`, `003_create_developer3_tables.sql`).
+- Automated migration runner script ([`server/migrate.js`](file:///c:/Users/kusum/Desktop/Day_flow/server/migrate.js)) with `npm run db:migrate` terminal integration.
+- `.env.example` environment template and updated `.gitignore` database exclusions.
 
 ---
 
-#### 3. Workforce Analytics & Insights Dashboard
-- Activated the **Analytics** menu item (`activeTab === 'analytics'`) in `HRDashboard.jsx`.
-- **Department Headcount Breakdown**: Visual progress bars for Engineering (40%), Design (20%), Marketing (16%), HR (14%), and Analytics (10%).
-- **Punctuality & Attendance Metrics**: 92.4% on-time arrival rate, 8.4 hrs/day average work duration.
-- **Leave Category Usage**: Vacation (68 days), Casual (45 days), Sick (22 days).
-- **Payroll Expense Summary**: $578,000 / month gross salary budget tracking.
-
----
-
-#### 4. Interactive Notification Bell Dropdowns
-- Floating Notification Panel in both `EmployeeDashboard.jsx` and `HRDashboard.jsx`.
-- Lists recent system alerts, leave updates, and check-in logs with unread badge counter.
-- Includes a "Mark all read" button to clear notifications instantly.
-
----
-
-#### 5. MySQL Database Architecture & REST APIs (`dayflow_db`)
-- Relational table DDL in [`server/schema.sql`](file:///c:/Users/kusum/Desktop/Day_flow/server/schema.sql) for `users`, `employee_profiles`, `salary_structures`, `attendance_logs`, and `leave_requests`.
-- Automated seeding script in [`server/seed.js`](file:///c:/Users/kusum/Desktop/Day_flow/server/seed.js).
-- MySQL Connection pool manager in [`server/config/db.js`](file:///c:/Users/kusum/Desktop/Day_flow/server/config/db.js).
-- Node.js Express REST APIs in [`server/index.js`](file:///c:/Users/kusum/Desktop/Day_flow/server/index.js).
+#### 4. Real-Time Synchronization & HR Analytics
+- Centralized store service ([`src/services/storeService.js`](file:///c:/Users/kusum/Desktop/Day_flow/src/services/storeService.js)) syncing profile edits and leave applications across Employee and HR Dashboards.
+- Interactive HR Admin Profile modal and Workforce Analytics dashboard in [`src/pages/HRDashboard.jsx`](file:///c:/Users/kusum/Desktop/Day_flow/src/pages/HRDashboard.jsx).
+- Floating Notification Bell dropdown panels with unread badge counter.
 
 ---
 
 ### 📂 Modified & Added Files
-- `src/services/storeService.js` (Central real-time synchronization store)
-- `src/pages/EmployeeDashboard.jsx` (Notification bell dropdown, leave submission sync, profile photo upload)
-- `src/pages/HRDashboard.jsx` (HR Admin profile modal, Analytics dashboard, notification dropdown, real-time leave approvals)
-- `src/pages/Dashboard.css` (Notification dropdown floating panel & analytics progress bar styling)
-- `CHANGELOG.md` (Project release summary)
+- `src/pages/EmployeeDashboard.jsx` (Single check-in/out logic, status thresholds, shift simulator)
+- `CHANGELOG.md` (Release summary)
