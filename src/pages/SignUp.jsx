@@ -4,6 +4,7 @@ import {
   Mail, Lock, Eye, EyeOff, ArrowRight, Zap,
   User, BadgeCheck, ShieldCheck, CheckCircle2, XCircle
 } from 'lucide-react';
+import { register } from '../services/authService';
 import './Auth.css';
 
 const PASSWORD_RULES = [
@@ -49,7 +50,7 @@ export default function SignUp() {
     return e;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const validationErrors = validate();
     if (Object.keys(validationErrors).length > 0) {
@@ -58,10 +59,16 @@ export default function SignUp() {
     }
     setErrors({});
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setStep(2);
-    }, 1500);
+
+    const result = await register(form.employeeId, form.email, form.password, form.role);
+    setIsLoading(false);
+
+    if (!result.success) {
+      setErrors({ general: result.message });
+      return;
+    }
+
+    setStep(2);
   };
 
   const passwordStrength = form.password

@@ -1,4 +1,5 @@
 // Attendance Service - Daily & Weekly Tracking, Check-In/Out, Status Management, Real-time MySQL Sync
+import { getAuthHeaders } from './authService';
 
 export const ATTENDANCE_STATUS_TYPES = {
   PRESENT: { label: 'Present', color: 'var(--success-400)', bg: 'rgba(16, 185, 129, 0.15)', border: 'rgba(16, 185, 129, 0.3)' },
@@ -32,7 +33,7 @@ export async function recordCheckIn(checkInTimeStr, status = 'PRESENT') {
   try {
     const res = await fetch(`${API_BASE_URL}/attendance/checkin`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ checkInTime: checkInTimeStr, status }),
     });
     return await res.json();
@@ -48,7 +49,7 @@ export async function recordCheckOut(checkOutTimeStr, loggedHoursStr, status = '
   try {
     const res = await fetch(`${API_BASE_URL}/attendance/checkout`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ checkOutTime: checkOutTimeStr, loggedHours: loggedHoursStr, status }),
     });
     return await res.json();
@@ -62,7 +63,9 @@ export async function recordCheckOut(checkOutTimeStr, loggedHoursStr, status = '
  */
 export async function fetchMyLeaves() {
   try {
-    const res = await fetch(`${API_BASE_URL}/leaves`);
+    const res = await fetch(`${API_BASE_URL}/leaves`, {
+      headers: { ...getAuthHeaders() },
+    });
     if (!res.ok) throw new Error('API offline');
     return await res.json();
   } catch {
@@ -77,7 +80,7 @@ export async function applyForLeave(leaveFormObj) {
   try {
     const res = await fetch(`${API_BASE_URL}/leaves/apply`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify(leaveFormObj),
     });
     return await res.json();

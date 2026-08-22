@@ -6,8 +6,9 @@ import {
   TrendingUp, Search, ChevronRight, BarChart3, UserCheck,
   Settings, Menu, X, ChevronDown, Check, ArrowUpDown, Edit3, Save, Shield, Eye, CalendarRange, Filter, User, Mail, Phone, MapPin, DollarSign, PieChart, Image as ImageIcon, Camera
 } from 'lucide-react';
-import { getStoredEmployees, updateStoredEmployeeProfile } from '../services/storeService';
+import { fetchAllEmployees } from '../services/employeeService';
 import { fetchLeaves, updateLeaveStatusAPI } from '../services/leaveService';
+import { getAuthHeaders, logout } from '../services/authService';
 import './Dashboard.css';
 
 const HR_NOTIFICATIONS = [
@@ -24,7 +25,7 @@ export default function HRDashboard() {
   const [attendanceStatusFilter, setAttendanceStatusFilter] = useState('all');
   
   // Real-time Synced States from Central Store
-  const [employees, setEmployees] = useState(() => getStoredEmployees());
+  const [employees, setEmployees] = useState([]);
   const [leaveRequests, setLeaveRequests] = useState([]);
   
   // Notification Dropdown State
@@ -55,11 +56,15 @@ export default function HRDashboard() {
 
   // Listen for Real-Time Synchronization Events across Dashboards (Employees)
   useEffect(() => {
-    const handleStoreChange = () => {
-      setEmployees(getStoredEmployees());
+    const loadEmployees = async () => {
+      const data = await fetchAllEmployees();
+      setEmployees(data.map(emp => ({
+        ...emp,
+        dept: emp.department || 'N/A',
+        role: emp.designation || 'N/A'
+      })));
     };
-    window.addEventListener('dayflow_store_update', handleStoreChange);
-    return () => window.removeEventListener('dayflow_store_update', handleStoreChange);
+    loadEmployees();
   }, []);
 
   // Fetch Leaves & Sync in Real-Time via Polling
@@ -116,14 +121,28 @@ export default function HRDashboard() {
     setEditForm({ ...emp });
   };
 
-  const handleSaveEmployee = (e) => {
+  const handleSaveEmployee = async (e) => {
     e.preventDefault();
-    updateStoredEmployeeProfile(editForm.id, {
-      phone: editForm.phone,
-      address: editForm.address,
-      avatarUrl: editForm.avatarUrl,
-      fullName: editForm.name,
-    });
+    try {
+      await fetch(`http://localhost:5000/api/employees/${editForm.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({
+          phone: editForm.phone,
+          address: editForm.address,
+          avatar_url: editForm.avatarUrl,
+          full_name: editForm.name,
+          email: editForm.email,
+          gender: editForm.gender
+        })
+      });
+      // Refresh employees list
+      const data = await fetchAllEmployees();
+      setEmployees(data.map(emp => ({ ...emp, dept: emp.department || 'N/A', role: emp.designation || 'N/A' })));
+    } catch (err) {
+      console.warn("Failed to sync profile change to backend", err);
+    }
+
     setEditingEmp(null);
     setSuccessToast(`Admin updated profile for ${editForm.name} (${editForm.id}) successfully!`);
     setTimeout(() => setSuccessToast(''), 4000);
@@ -220,10 +239,10 @@ export default function HRDashboard() {
         </nav>
 
         <div className="sidebar-footer">
-          <Link to="/signin" className="sidebar-link sidebar-link-danger">
+          <button onClick={() => logout()} className="sidebar-link sidebar-link-danger" style={{ width: '100%', border: 'none', cursor: 'pointer' }}>
             <div className="sidebar-link-icon"><LogOut size={20} /></div>
             <span>Logout</span>
-          </Link>
+          </button>
         </div>
       </aside>
 
@@ -961,9 +980,23 @@ export default function HRDashboard() {
                     <input
                       type="text"
                       className="form-input"
-                      value={editForm.phone}
+                      value={editForm.phone || ''}
                       onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                     />
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Gender</label>
+                    <select
+                      className="form-input"
+                      value={editForm.gender || 'Not Specified'}
+                      onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}
+                    >
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Non-binary">Non-binary</option>
+                      <option value="Not Specified">Not Specified</option>
+                    </select>
                   </div>
                 </div>
               </div>

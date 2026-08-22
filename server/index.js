@@ -2,6 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { query, testConnection } from './config/db.js';
+import { hashPassword, comparePassword, generateToken, authenticateToken, authorizeRole } from './config/auth.js';
+import { randomUUID } from 'crypto';
 
 dotenv.config();
 
@@ -80,7 +82,7 @@ let inMemoryDb = {
 
 // ------------------- API ROUTES -------------------
 
-// Health Check
+// Health Check (PUBLIC)
 app.get('/api/health', async (req, res) => {
   const isDbConnected = await testConnection();
   res.json({
@@ -90,58 +92,169 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
-// Authentication Routes
+// ==================== AUTHENTICATION ROUTES (PUBLIC) ====================
+
+// Register — hashes password with bcrypt before storing
 app.post('/api/auth/register', async (req, res) => {
   const { employeeId, email, password, role } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ success: false, message: 'Email and password are required.' });
+  }
+
   try {
     const isDbConnected = await testConnection();
     if (isDbConnected) {
-      const result = await query(
-        'INSERT INTO users (employee_id, email, password_hash, role) VALUES (?, ?, ?, ?)',
-        [employeeId, email, password, role || 'employee']
+      // Check if email already exists
+      const existing = await query('SELECT id FROM users WHERE email = ?', [email]);
+      if (existing.length > 0) {
+        return res.status(409).json({ success: false, message: 'An account with this email already exists.' });
+      }
+
+      const passwordHash = await hashPassword(password);
+      const newId = randomUUID();
+      await query(
+        'INSERT INTO users (id, employee_id, email, password_hash, role) VALUES (?, ?, ?, ?, ?)',
+        [newId, employeeId, email, passwordHash, role || 'employee']
       );
-      return res.json({ success: true, message: 'User registered in MySQL database', userId: result.insertId });
+      return res.json({ success: true, message: 'Account created successfully! You can now sign in.' });
     }
   } catch (err) {
-    console.warn('MySQL Register Query Error:', err.message);
+    console.warn('MySQL Register Error:', err.message);
+    return res.status(500).json({ success: false, message: 'Registration failed. Please try again.' });
   }
-  res.json({ success: true, message: 'Registered user successfully (dev mode)', user: { employeeId, email, role } });
+
+  // Fallback dev mode
+  res.json({ success: true, message: 'Registered user successfully (dev mode)' });
 });
 
+// Login — verifies password with bcrypt, returns signed JWT
 app.post('/api/auth/login', async (req, res) => {
-  const { email, role } = req.body;
+  const { email, password, role } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ success: false, message: 'Email and password are required.' });
+  }
+
   try {
     const isDbConnected = await testConnection();
     if (isDbConnected) {
       const users = await query('SELECT * FROM users WHERE email = ?', [email]);
-      if (users.length > 0) {
-        return res.json({ success: true, token: 'jwt_mock_token_123', user: users[0] });
+
+      if (users.length === 0) {
+        return res.status(401).json({ success: false, message: 'No account found with this email.' });
       }
+
+      const user = users[0];
+
+      // Verify password with bcrypt
+      const isPasswordValid = await comparePassword(password, user.password_hash);
+      if (!isPasswordValid) {
+        return res.status(401).json({ success: false, message: 'Incorrect password. Please try again.' });
+      }
+
+      // Check role match
+      if (role && user.role !== role) {
+        return res.status(403).json({ success: false, message: `This account is registered as '${user.role}', not '${role}'.` });
+      }
+
+      // Generate JWT token
+      const token = generateToken(user);
+
+      return res.json({
+        success: true,
+        token,
+        user: {
+          id: user.id,
+          employeeId: user.employee_id,
+          email: user.email,
+          role: user.role,
+        },
+      });
     }
   } catch (err) {
-    console.warn('MySQL Login Query Error:', err.message);
+    console.warn('MySQL Login Error:', err.message);
+    return res.status(500).json({ success: false, message: 'Login failed. Please try again.' });
   }
-  res.json({ success: true, token: 'jwt_mock_token_123', user: { email, role: role || 'employee' } });
+
+  // Fallback dev mode — generate a real JWT even in dev mode
+  const mockUser = { id: 1, email, role: role || 'employee' };
+  const token = generateToken(mockUser);
+  res.json({ success: true, token, user: mockUser });
 });
 
-// GET Employee Profile
-app.get('/api/employee/profile', async (req, res) => {
+// ==================== PROTECTED ROUTES (JWT REQUIRED) ====================
+
+// GET All Employees (HR Only)
+app.get('/api/employees', authenticateToken, authorizeRole('hr'), async (req, res) => {
   try {
     const isDbConnected = await testConnection();
     if (isDbConnected) {
-      const profiles = await query('SELECT * FROM employee_profiles WHERE user_id = 1');
+      const rows = await query(`
+        SELECT p.*, u.email, u.employee_id 
+        FROM employee_profiles p 
+        JOIN users u ON p.user_id = u.id
+      `);
+      const employees = rows.map(p => ({
+        id: p.employee_id,
+        name: p.full_name,
+        email: p.email,
+        phone: p.phone,
+        department: p.department,
+        designation: p.designation,
+        status: p.status,
+        avatarUrl: p.avatar_url,
+      }));
+      return res.json(employees);
+    }
+  } catch (err) {
+    console.error('Failed to fetch employees:', err);
+    return res.status(500).json({ error: 'Failed to fetch employees' });
+  }
+});
+
+// PUT Employee Profile (HR Only)
+app.put('/api/employees/:employeeId', authenticateToken, authorizeRole('hr'), async (req, res) => {
+  const empId = req.params.employeeId;
+  const updates = req.body;
+  try {
+    const isDbConnected = await testConnection();
+    if (isDbConnected) {
+      await query(`
+        UPDATE employee_profiles 
+        SET phone = ?, address = ?, avatar_url = ?, full_name = ?, gender = ?
+        WHERE user_id = (SELECT id FROM users WHERE employee_id = ?)
+      `, [updates.phone, updates.address, updates.avatar_url, updates.full_name, updates.gender, empId]);
+      return res.json({ success: true, message: 'Profile updated' });
+    }
+  } catch (err) {
+    console.error('Failed to update employee:', err);
+    return res.status(500).json({ error: 'Failed to update employee' });
+  }
+});
+app.get('/api/employee/profile', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  try {
+    const isDbConnected = await testConnection();
+    if (isDbConnected) {
+      const profiles = await query(`
+        SELECT p.*, u.email 
+        FROM employee_profiles p 
+        JOIN users u ON p.user_id = u.id 
+        WHERE p.user_id = ?
+      `, [userId]);
       if (profiles.length > 0) {
         const p = profiles[0];
         const salary = await query('SELECT * FROM salary_structures WHERE profile_id = ?', [p.id]);
         const s = salary[0] || {};
-        
+
         return res.json({
           personalDetails: {
             id: p.id ? `EMP-2026-00${p.id}` : 'EMP-2026-0842',
             fullName: p.full_name,
-            email: 'alex.morgan@dayflow.io',
+            email: p.email,
             phone: p.phone,
-            dob: p.dob,
+            dob: p.dob ? new Date(p.dob).toISOString().split('T')[0] : '1994-06-15',
             gender: p.gender,
             address: p.address,
             avatarUrl: p.avatar_url,
@@ -161,19 +274,20 @@ app.get('/api/employee/profile', async (req, res) => {
             status: p.status,
           },
           salaryStructure: {
-            currency: s.currency || 'USD',
-            annualPackage: s.annual_package || '$145,000',
-            monthlyBase: s.monthly_base || '$8,500',
-            hra: s.hra || '$2,200',
-            specialAllowance: s.special_allowance || '$1,383',
-            grossMonthly: s.gross_monthly || '$12,083',
+            currency: 'USD',
+            annualPackage: s.gross_salary ? `$${(Number(s.gross_salary) * 12).toLocaleString()}` : '$145,000',
+            monthlyBase: s.basic_salary ? `$${Number(s.basic_salary).toLocaleString()}` : '$8,500',
+            hra: s.hra ? `$${Number(s.hra).toLocaleString()}` : '$2,200',
+            specialAllowance: s.special_allowance ? `$${Number(s.special_allowance).toLocaleString()}` : '$1,383',
+            grossMonthly: s.gross_salary ? `$${Number(s.gross_salary).toLocaleString()}` : '$12,083',
             deductions: {
-              tax: s.tax_deduction || '$1,850',
-              providentFund: s.pf_deduction || '$650',
-              insurance: s.insurance_deduction || '$150',
-              totalDeductions: '$2,650',
+              tax: s.tax_deduction ? `$${Number(s.tax_deduction).toLocaleString()}` : '$1,850',
+              providentFund: s.pf_deduction ? `$${Number(s.pf_deduction).toLocaleString()}` : '$650',
+              insurance: s.other_deductions ? `$${Number(s.other_deductions).toLocaleString()}` : '$150',
+              totalDeductions: (s.tax_deduction && s.pf_deduction && s.other_deductions) 
+                ? `$${(Number(s.tax_deduction) + Number(s.pf_deduction) + Number(s.other_deductions)).toLocaleString()}` : '$2,650',
             },
-            netMonthlyPay: s.net_monthly_pay || '$9,433',
+            netMonthlyPay: s.net_salary ? `$${Number(s.net_salary).toLocaleString()}` : '$9,433',
             bankDetails: {
               bankName: s.bank_name || 'Chase Bank',
               accountNumber: s.account_number || '•••• •••• 4892',
@@ -189,17 +303,24 @@ app.get('/api/employee/profile', async (req, res) => {
   res.json(inMemoryDb.profile);
 });
 
-// PUT Update Employee Profile
-app.put('/api/employee/profile', async (req, res) => {
+// PUT Update Employee Profile — uses req.user.userId from JWT
+app.put('/api/employee/profile', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
   const { personalDetails, jobDetails } = req.body;
   try {
     const isDbConnected = await testConnection();
     if (isDbConnected) {
       if (personalDetails) {
         await query(
-          'UPDATE employee_profiles SET phone = ?, address = ?, avatar_url = ? WHERE user_id = 1',
-          [personalDetails.phone, personalDetails.address, personalDetails.avatarUrl]
+          'UPDATE employee_profiles SET phone = ?, address = ?, avatar_url = ?, full_name = ?, gender = ? WHERE user_id = ?',
+          [personalDetails.phone, personalDetails.address, personalDetails.avatarUrl, personalDetails.fullName, personalDetails.gender, userId]
         );
+        if (personalDetails.email) {
+          await query(
+            'UPDATE users SET email = ? WHERE id = ?',
+            [personalDetails.email, userId]
+          );
+        }
       }
       return res.json({ success: true, message: 'Updated employee profile in MySQL database' });
     }
@@ -216,16 +337,18 @@ app.put('/api/employee/profile', async (req, res) => {
   res.json({ success: true, message: 'Profile updated in server state', profile: inMemoryDb.profile });
 });
 
-// Attendance Check-In / Check-Out Routes
-app.post('/api/attendance/checkin', async (req, res) => {
+// Attendance Check-In — uses req.user.userId from JWT
+app.post('/api/attendance/checkin', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
   const { checkInTime, status } = req.body;
   try {
     const isDbConnected = await testConnection();
     if (isDbConnected) {
       const today = new Date().toISOString().split('T')[0];
+      const newId = randomUUID();
       await query(
-        'INSERT INTO attendance_logs (user_id, log_date, check_in_time, status) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE check_in_time = ?, status = ?',
-        [1, today, checkInTime || '09:02 AM', status || 'PRESENT', checkInTime || '09:02 AM', status || 'PRESENT']
+        'INSERT INTO attendance_logs (id, user_id, log_date, check_in_time, status) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE check_in_time = ?, status = ?',
+        [newId, userId, today, checkInTime || '09:02 AM', status || 'PRESENT', checkInTime || '09:02 AM', status || 'PRESENT']
       );
       return res.json({ success: true, message: 'Check-in recorded in MySQL database' });
     }
@@ -235,15 +358,17 @@ app.post('/api/attendance/checkin', async (req, res) => {
   res.json({ success: true, message: 'Checked in successfully (dev mode)' });
 });
 
-app.post('/api/attendance/checkout', async (req, res) => {
+// Attendance Check-Out — uses req.user.userId from JWT
+app.post('/api/attendance/checkout', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
   const { checkOutTime, loggedHours, status } = req.body;
   try {
     const isDbConnected = await testConnection();
     if (isDbConnected) {
       const today = new Date().toISOString().split('T')[0];
       await query(
-        'UPDATE attendance_logs SET check_out_time = ?, logged_hours = ?, status = ? WHERE user_id = 1 AND log_date = ?',
-        [checkOutTime || '05:30 PM', loggedHours || '8.5 hrs', status || 'PRESENT', today]
+        'UPDATE attendance_logs SET check_out_time = ?, logged_hours = ?, status = ? WHERE user_id = ? AND log_date = ?',
+        [checkOutTime || '05:30 PM', loggedHours || '8.5 hrs', status || 'PRESENT', userId, today]
       );
       return res.json({ success: true, message: 'Check-out recorded in MySQL database' });
     }
@@ -253,12 +378,19 @@ app.post('/api/attendance/checkout', async (req, res) => {
   res.json({ success: true, message: 'Checked out successfully (dev mode)' });
 });
 
-// LEAVE REQUESTS MYSQL ROUTES
-app.get('/api/leaves', async (req, res) => {
+// GET Leave Requests — uses req.user.userId from JWT
+app.get('/api/leaves', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
   try {
     const isDbConnected = await testConnection();
     if (isDbConnected) {
-      const leaves = await query('SELECT * FROM leave_requests WHERE user_id = 1 ORDER BY id DESC');
+      // HR can see all leaves, employees see only their own
+      let leaves;
+      if (req.user.role === 'hr') {
+        leaves = await query('SELECT lr.*, u.email as employee_email FROM leave_requests lr JOIN users u ON lr.user_id = u.id ORDER BY lr.id DESC');
+      } else {
+        leaves = await query('SELECT * FROM leave_requests WHERE user_id = ? ORDER BY id DESC', [userId]);
+      }
       if (leaves.length > 0) {
         const formatted = leaves.map((l) => ({
           id: `LV-${l.id}`,
@@ -279,16 +411,19 @@ app.get('/api/leaves', async (req, res) => {
   res.json(inMemoryDb.leaves);
 });
 
-app.post('/api/leaves/apply', async (req, res) => {
+// POST Apply for Leave — uses req.user.userId from JWT
+app.post('/api/leaves/apply', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
   const { type, fromDate, toDate, days, reason } = req.body;
   try {
     const isDbConnected = await testConnection();
     if (isDbConnected) {
-      const result = await query(
-        'INSERT INTO leave_requests (user_id, leave_type, from_date, to_date, total_days, reason, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [1, type || 'Casual Leave', fromDate, toDate, days || 1, reason, 'pending']
+      const newId = randomUUID();
+      await query(
+        'INSERT INTO leave_requests (id, user_id, leave_type, from_date, to_date, total_days, reason, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [newId, userId, type || 'Casual Leave', fromDate, toDate, days || 1, reason, 'pending']
       );
-      return res.json({ success: true, message: 'Leave request inserted into MySQL database', leaveId: result.insertId });
+      return res.json({ success: true, message: 'Leave request submitted successfully.', leaveId: newId });
     }
   } catch (err) {
     console.warn('MySQL Apply Leave Error:', err.message);
@@ -308,7 +443,8 @@ app.post('/api/leaves/apply', async (req, res) => {
   res.json({ success: true, message: 'Leave request submitted', leave: newLeave });
 });
 
-app.put('/api/leaves/:id/status', async (req, res) => {
+// PUT Approve/Reject Leave — HR ONLY
+app.put('/api/leaves/:id/status', authenticateToken, authorizeRole('hr'), async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   const numericId = id.replace('LV-', '');

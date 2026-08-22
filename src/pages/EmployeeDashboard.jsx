@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { getEmployeeProfile, updateEmployeeProfile } from '../services/employeeService';
 import { MOCK_WEEKLY_ATTENDANCE, MOCK_DAILY_TIMELINE, ATTENDANCE_STATUS_TYPES } from '../services/attendanceService';
-import { updateStoredEmployeeProfile } from '../services/storeService';
+
 import { fetchLeaves, applyLeave } from '../services/leaveService';
 import './Dashboard.css';
 
@@ -98,10 +98,17 @@ export default function EmployeeDashboard() {
   });
 
   useEffect(() => {
-    getEmployeeProfile().then((data) => {
-      setProfileData(data);
-      initFormData(data);
-    });
+    const loadProfile = () => {
+      getEmployeeProfile().then((data) => {
+        setProfileData(data);
+        initFormData(data);
+      });
+    };
+    
+    loadProfile();
+    
+    window.addEventListener('dayflow_store_update', loadProfile);
+    return () => window.removeEventListener('dayflow_store_update', loadProfile);
   }, []);
 
   // Fetch Leaves & Sync in Real-Time via Polling
@@ -231,12 +238,6 @@ export default function EmployeeDashboard() {
 
     setProfileData(updated);
     updateEmployeeProfile(updated);
-    updateStoredEmployeeProfile('EMP-001', {
-      phone: editFormData.phone,
-      address: editFormData.address,
-      avatarUrl: editFormData.avatarUrl,
-      fullName: editFormData.fullName,
-    });
     setIsEditModalOpen(false);
     
     setSaveSuccessMsg('Your profile details & picture have been updated and synced with HR Admin!');

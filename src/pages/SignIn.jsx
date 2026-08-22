@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Zap, User, ShieldCheck } from 'lucide-react';
+import { login } from '../services/authService';
 import './Auth.css';
 
 export default function SignIn() {
@@ -10,6 +11,7 @@ export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [serverError, setServerError] = useState('');
   const navigate = useNavigate();
 
   const validate = () => {
@@ -21,7 +23,7 @@ export default function SignIn() {
     return newErrors;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const validationErrors = validate();
     if (Object.keys(validationErrors).length > 0) {
@@ -29,17 +31,24 @@ export default function SignIn() {
       return;
     }
     setErrors({});
+    setServerError('');
     setIsLoading(true);
     
-    // Role-based navigation for Admin vs Employee
-    setTimeout(() => {
-      setIsLoading(false);
-      if (role === 'hr') {
-        navigate('/dashboard/hr');
-      } else {
-        navigate('/dashboard/employee');
-      }
-    }, 1200);
+    const result = await login(email, password, role);
+    setIsLoading(false);
+
+    if (!result.success) {
+      setServerError(result.message);
+      return;
+    }
+
+    // Navigate based on the user's actual role from the server
+    const userRole = result.user?.role || role;
+    if (userRole === 'hr') {
+      navigate('/dashboard/hr');
+    } else {
+      navigate('/dashboard/employee');
+    }
   };
 
   return (
@@ -130,6 +139,20 @@ export default function SignIn() {
             </div>
 
             <form className="auth-form" onSubmit={handleSubmit}>
+              {serverError && (
+                <div style={{
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                  borderRadius: '0.5rem',
+                  padding: '0.75rem 1rem',
+                  color: '#ef4444',
+                  fontSize: '0.85rem',
+                  fontWeight: 500,
+                  marginBottom: '0.75rem',
+                }}>
+                  ⚠️ {serverError}
+                </div>
+              )}
               <div className={`form-group ${errors.email ? 'form-group-error' : ''}`}>
                 <label className="form-label" htmlFor="email">Email Address</label>
                 <div className="form-input-wrapper">

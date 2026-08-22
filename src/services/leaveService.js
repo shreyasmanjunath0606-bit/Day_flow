@@ -1,8 +1,12 @@
+import { getAuthHeaders } from './authService';
+
 const API_BASE_URL = 'http://localhost:5000/api';
 
 export async function fetchLeaves() {
   try {
-    const response = await fetch(`${API_BASE_URL}/leaves`);
+    const response = await fetch(`${API_BASE_URL}/leaves`, {
+      headers: { ...getAuthHeaders() },
+    });
     if (!response.ok) throw new Error('Failed to fetch leaves');
     return await response.json();
   } catch (err) {
@@ -15,7 +19,7 @@ export async function applyLeave(leaveData) {
   try {
     const response = await fetch(`${API_BASE_URL}/leaves/apply`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify(leaveData),
     });
     if (!response.ok) throw new Error('Failed to apply for leave');
@@ -30,7 +34,7 @@ export async function updateLeaveStatusAPI(leaveId, status) {
   try {
     const response = await fetch(`${API_BASE_URL}/leaves/${leaveId}/status`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify({ status }),
     });
     if (!response.ok) throw new Error('Failed to update leave status');

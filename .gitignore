@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment files (contain secrets)
+.env
+server/.env
+
+# Database local files
+*.db
+*.sqlite
+data/

@@ -1,4 +1,5 @@
 // Employee Service - Mock Data & Node.js API Service layer
+import { getAuthHeaders } from './authService';
 
 export const MOCK_EMPLOYEE_PROFILE = {
   personalDetails: {
@@ -88,7 +89,9 @@ const API_BASE_URL = 'http://localhost:5000/api';
  */
 export async function getEmployeeProfile() {
   try {
-    const response = await fetch(`${API_BASE_URL}/employee/profile`);
+    const response = await fetch(`${API_BASE_URL}/employee/profile`, {
+      headers: { ...getAuthHeaders() },
+    });
     if (!response.ok) throw new Error('API unavailable');
     const data = await response.json();
     return data;
@@ -99,13 +102,29 @@ export async function getEmployeeProfile() {
 }
 
 /**
+ * Fetch all employee profiles from Node.js backend (HR Admin only)
+ */
+export async function fetchAllEmployees() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/employees`, {
+      headers: { ...getAuthHeaders() },
+    });
+    if (!response.ok) throw new Error('API unavailable');
+    return await response.json();
+  } catch (error) {
+    console.error("Failed to fetch employees:", error);
+    return [];
+  }
+}
+
+/**
  * Update employee profile details
  */
 export async function updateEmployeeProfile(updatedDetails) {
   try {
     const response = await fetch(`${API_BASE_URL}/employee/profile`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
       body: JSON.stringify(updatedDetails),
     });
     if (!response.ok) throw new Error('Failed to update profile');

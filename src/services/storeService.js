@@ -42,6 +42,8 @@ export function updateStoredEmployeeProfile(employeeId, updatedFields) {
       address: updatedFields.address || employees[index].address,
       avatarUrl: updatedFields.avatarUrl || employees[index].avatarUrl,
       name: updatedFields.fullName || employees[index].name,
+      email: updatedFields.email || employees[index].email,
+      gender: updatedFields.gender || employees[index].gender,
     };
     localStorage.setItem('dayflow_employees', JSON.stringify(employees));
     notifyStoreChange();
