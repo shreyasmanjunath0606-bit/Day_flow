@@ -1,64 +1,57 @@
 # DayFlow - Project Release & Feature Updates
 
-## Update: HR Admin Edit All Employee Details Feature + Role Permissions & Sign-In Fix
+## Update: Attendance Tracking System & Role-Based Attendance View Permissions
 
 ### 🚀 Newly Added Features
 
-#### 1. HR Admin Edit All Employee Details Dashboard
-- **Admin Edit Action**: Added an **"Edit All Details"** button in the Employee Directory table on the HR Admin Dashboard ([`src/pages/HRDashboard.jsx`](file:///c:/Users/kusum/Desktop/Day_flow/src/pages/HRDashboard.jsx)).
-- **Full Employee Detail Editing Modal**:
-  - HR Admins can edit **all** employee details:
-    - Full Name & Employee ID
-    - Email Address & Phone Number
-    - Residential Address
-    - Job Designation & Role
-    - Department
-    - Attendance Status (Present, Absent, On Leave, Late)
-    - Salary Package / CTC
-- **Live State Updates**: Saving updates the employee record in real-time with success toast confirmation.
+#### 1. Attendance View Permissions (Employee vs Admin)
+- 👤 **Employee View**: Employees can view **only** their own attendance records (live shift timer, personal check-in/out times, daily timeline, and personal 7-day weekly schedule).
+- 👑 **Admin / HR View**: HR Admins can view the attendance records of **all employees** across the company on the **Master Attendance Dashboard** ([`src/pages/HRDashboard.jsx`](file:///c:/Users/kusum/Desktop/Day_flow/src/pages/HRDashboard.jsx)). Includes search and status filtering (Present, Half-day, Absent, Leave) and an interactive **Full Attendance Log Modal** for any selected employee.
 
 ---
 
-#### 2. Edit Profile Modal with Role-Based Permissions
-- **Edit Modal**: Accessible via the **"Edit Profile"** button on the Profile header.
-- **Permission Modes**:
-  - 👤 **Employee Mode (Limited Edit)**:
-    - Employees can edit **only** limited fields: **Phone Number**, **Residential Address**, and **Profile Picture URL**.
-    - All other sensitive fields (Employee ID, Email, DOB, Gender, Designation, Department, Salary) are locked with 🔒 lock indicators.
-  - 👑 **Admin / HR Mode (Full Edit)**:
-    - Admin users have full permissions to edit **all** employee details across Personal, Job, and Salary categories.
+#### 2. Interactive Attendance Tracking System
+- **Check-In / Check-Out Hero Widget**:
+  - Live **Check In Now** / **Check Out Now** toggle button.
+  - Live duration timer (`04h 22m 15s`) while checked in.
+  - Records exact check-in and check-out timestamps.
+- **Daily & Weekly Attendance Views**:
+  - **Daily View**: Shift log summary, effective work hours, and daily event timeline (Check-in, Lunch Break, Work in progress).
+  - **Weekly View**: 7-day calendar cards (Mon–Sun) showing date, check-in, check-out, hours logged, and status badges.
+- **4 Attendance Status Types**:
+  - 🟢 **Present** (Full Shift, 8+ hours)
+  - 🟡 **Half-day** (4 Hours)
+  - 🔴 **Absent**
+  - 🔵 **Leave** (Approved casual/sick leave)
 
 ---
 
-#### 3. HR / Admin Account Registration & Sign-In Flow
-- **Fixed Admin Sign-Up**: Registering with the **HR / Admin** role option creates the Admin account and provides an instant **"Go to HR / Admin Dashboard"** navigation action.
-- **Role Selector on Sign-In Page**:
-  - Added a role toggle bar (**Employee** vs **HR / Admin**) directly on the Sign-In page ([`src/pages/SignIn.jsx`](file:///c:/Users/kusum/Desktop/Day_flow/src/pages/SignIn.jsx)).
-  - Signing in under **HR / Admin** routes directly to `/dashboard/hr`.
-  - Signing in under **Employee** routes directly to `/dashboard/employee`.
+#### 3. HR Admin Edit All Employee Details Dashboard
+- **Admin Edit Action**: Added an **"Edit All Details"** button in the Employee Directory table on the HR Admin Dashboard.
+- **Full Employee Detail Editing Modal**: HR Admins can edit **all** personal, job, designation, department, status, address, and salary details for any employee.
 
 ---
 
-#### 4. Employee Dashboard - View Profile System
-- **Personal Details**: Employee ID (`EMP-2026-0842`), Full Name, Email, Phone, DOB, Gender, Address, Emergency Contact.
-- **Job Details**: Job Designation (`Senior Frontend Engineer`), Department, Employment Type, Date of Joining, Manager Name, Location, Status.
-- **Salary Structure**: Net Monthly Pay, Annual CTC, Allowances breakdown, Deductions, Bank Account details.
-- **Documents Management**: Uploaded employment documents with status badges and download triggers.
+#### 4. Edit Profile Modal with Role-Based Permissions
+- 👤 **Employee Mode (Limited Edit)**: Phone, Residential Address, Profile Picture URL.
+- 👑 **Admin / HR Mode (Full Edit)**: Full permissions to edit all fields across Personal, Job, and Salary categories.
 
 ---
 
-#### 5. Node.js Backend Architecture
+#### 5. HR / Admin Account Registration & Sign-In Flow
+- Added Role selector toggle (**Employee** vs **HR / Admin**) on the Sign-In page (`/signin`) and enabled instant HR Admin Dashboard access upon sign-up (`/dashboard/hr`).
+
+---
+
+#### 6. Node.js Backend Architecture
 - Node.js Express server configured in `server/index.js` exposing REST API endpoints (`GET /api/employee/profile`, `PUT /api/employee/profile`, `GET /api/health`).
-- `src/services/employeeService.js` abstraction layer communicating with Node.js APIs with instant fallback mock data.
+- `src/services/employeeService.js` and `src/services/attendanceService.js` abstraction layers communicating with Node.js APIs with instant fallback mock data.
 
 ---
 
-### 📂 Modified Files
-- `src/pages/HRDashboard.jsx` (Added Admin Edit Employee Details modal and table action triggers)
-- `src/pages/EmployeeDashboard.jsx` (Added Edit Profile modal & role-based editing logic)
-- `src/pages/SignIn.jsx` (Added Role selector toggle for Employee vs HR/Admin login)
-- `src/pages/SignUp.jsx` (Updated HR/Admin registration success action & dashboard navigation)
-- `src/pages/Dashboard.css` (Added modal, permission badges & switcher styling)
-- `src/services/employeeService.js` (Added profile service layer & update handlers)
-- `server/package.json` & `server/index.js` (Node.js Express backend server)
+### 📂 Modified & Added Files
+- `src/services/attendanceService.js` (Added attendance tracking service layer & status definitions)
+- `src/pages/EmployeeDashboard.jsx` (Added Attendance tracking view, check-in widget, daily/weekly view switcher)
+- `src/pages/HRDashboard.jsx` (Added Master All-Employee attendance view & attendance log modal)
+- `src/pages/Dashboard.css` (Added attendance hero widget, status badges, and weekly card styling)
 - `CHANGELOG.md` (Project update record for evaluators)

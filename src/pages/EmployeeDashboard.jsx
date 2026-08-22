@@ -6,9 +6,10 @@ import {
   TrendingUp, Calendar, ChevronRight, Sun, Menu, X,
   Briefcase, DollarSign, Folder, Camera, Mail, Phone,
   MapPin, ShieldAlert, Award, Download, UploadCloud, Edit3, Check,
-  Lock, Shield, Save
+  Lock, Shield, Save, Play, Pause, CalendarRange, ListFilter
 } from 'lucide-react';
 import { getEmployeeProfile, updateEmployeeProfile } from '../services/employeeService';
+import { MOCK_WEEKLY_ATTENDANCE, MOCK_DAILY_TIMELINE, ATTENDANCE_STATUS_TYPES } from '../services/attendanceService';
 import './Dashboard.css';
 
 const RECENT_ACTIVITY = [
@@ -55,7 +56,7 @@ const QUICK_STATS = [
 
 export default function EmployeeDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'profile'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'profile' | 'attendance'
   const [profileSubTab, setProfileSubTab] = useState('personal'); // 'personal' | 'job' | 'salary' | 'documents'
   const [profileData, setProfileData] = useState(null);
   
@@ -65,12 +66,63 @@ export default function EmployeeDashboard() {
   const [editFormData, setEditFormData] = useState({});
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
 
+  // Attendance Tracking States
+  const [attendanceView, setAttendanceView] = useState('daily'); // 'daily' | 'weekly'
+  const [isCheckedIn, setIsCheckedIn] = useState(true);
+  const [checkInTime, setCheckInTime] = useState('09:02 AM');
+  const [checkOutTime, setCheckOutTime] = useState('—');
+  const [workSeconds, setWorkSeconds] = useState(15735); // ~4 hours 22 mins
+  const [todayStatus, setTodayStatus] = useState('PRESENT'); // 'PRESENT' | 'HALF_DAY' | 'ABSENT' | 'LEAVE'
+  const [weeklyRecords, setWeeklyRecords] = useState(MOCK_WEEKLY_ATTENDANCE);
+
   useEffect(() => {
     getEmployeeProfile().then((data) => {
       setProfileData(data);
       initFormData(data);
     });
   }, []);
+
+  // Timer loop for active check-in
+  useEffect(() => {
+    let interval = null;
+    if (isCheckedIn) {
+      interval = setInterval(() => {
+        setWorkSeconds((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isCheckedIn]);
+
+  const formatTimer = (totalSecs) => {
+    const hrs = Math.floor(totalSecs / 3600);
+    const mins = Math.floor((totalSecs % 3600) / 60);
+    const secs = totalSecs % 60;
+    return `${String(hrs).padStart(2, '0')}h ${String(mins).padStart(2, '0')}m ${String(secs).padStart(2, '0')}s`;
+  };
+
+  const handleToggleCheckIn = () => {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    if (isCheckedIn) {
+      // Check Out
+      setIsCheckedIn(false);
+      setCheckOutTime(timeStr);
+      // Determine status based on logged hours
+      const hrsLogged = workSeconds / 3600;
+      if (hrsLogged < 4) {
+        setTodayStatus('HALF_DAY');
+      } else {
+        setTodayStatus('PRESENT');
+      }
+    } else {
+      // Check In
+      setIsCheckedIn(true);
+      setCheckInTime(timeStr);
+      setCheckOutTime('—');
+      setTodayStatus('PRESENT');
+    }
+  };
 
   const initFormData = (data) => {
     if (!data) return;
@@ -169,6 +221,19 @@ export default function EmployeeDashboard() {
   const salary = profileData?.salaryStructure || {};
   const documents = profileData?.documents || [];
 
+  const renderStatusBadge = (statusKey) => {
+    const config = ATTENDANCE_STATUS_TYPES[statusKey] || ATTENDANCE_STATUS_TYPES.PRESENT;
+    return (
+      <span
+        className="weekly-status-chip"
+        style={{ color: config.color, background: config.bg, border: `1px solid ${config.border}` }}
+      >
+        <span className="status-dot" style={{ background: config.color }} />
+        {config.label}
+      </span>
+    );
+  };
+
   return (
     <div className="dashboard-layout">
       {/* Sidebar */}
@@ -205,10 +270,15 @@ export default function EmployeeDashboard() {
             <span>My Profile</span>
           </button>
 
-          <a href="#" className="sidebar-link" onClick={(e) => e.preventDefault()}>
+          <button
+            onClick={() => { setActiveTab('attendance'); setSidebarOpen(false); }}
+            className={`sidebar-link ${activeTab === 'attendance' ? 'sidebar-link-active' : ''}`}
+            style={{ width: '100%', border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer' }}
+          >
             <div className="sidebar-link-icon"><CalendarCheck size={20} /></div>
             <span>Attendance</span>
-          </a>
+          </button>
+
           <a href="#" className="sidebar-link" onClick={(e) => e.preventDefault()}>
             <div className="sidebar-link-icon"><FileText size={20} /></div>
             <span>Leave Requests</span>
@@ -236,14 +306,14 @@ export default function EmployeeDashboard() {
             </button>
             <div className="topbar-greeting">
               <h1 className="topbar-title">
-                {activeTab === 'dashboard' ? (
-                  <>{getGreeting()}, <span className="gradient-text">{personal.fullName ? personal.fullName.split(' ')[0] : 'Alex'}</span></>
-                ) : (
-                  <>Employee <span className="gradient-text">Profile</span></>
-                )}
+                {activeTab === 'dashboard' && <>{getGreeting()}, <span className="gradient-text">{personal.fullName ? personal.fullName.split(' ')[0] : 'Alex'}</span></>}
+                {activeTab === 'profile' && <>Employee <span className="gradient-text">Profile</span></>}
+                {activeTab === 'attendance' && <>Attendance <span className="gradient-text">Tracking</span></>}
               </h1>
               <p className="topbar-subtitle">
-                {activeTab === 'dashboard' ? "Here's your daily overview" : 'Manage your personal details, job role, salary & documents'}
+                {activeTab === 'dashboard' && "Here's your daily overview"}
+                {activeTab === 'profile' && 'Manage your personal details, job role, salary & documents'}
+                {activeTab === 'attendance' && 'Live check-in/out, daily timeline logs & weekly views'}
               </p>
             </div>
           </div>
@@ -269,7 +339,8 @@ export default function EmployeeDashboard() {
 
         {/* Content Body */}
         <div className="dashboard-content">
-          {activeTab === 'dashboard' ? (
+          {/* TAB 1: OVERVIEW DASHBOARD */}
+          {activeTab === 'dashboard' && (
             <>
               {/* Quick Stats */}
               <section className="stats-grid">
@@ -304,13 +375,13 @@ export default function EmployeeDashboard() {
                     </button>
                   </div>
 
-                  <div className="quick-card quick-card-attendance">
+                  <div className="quick-card quick-card-attendance" onClick={() => setActiveTab('attendance')} style={{ cursor: 'pointer' }}>
                     <div className="quick-card-glow" />
                     <div className="quick-card-icon">
                       <CalendarCheck size={28} />
                     </div>
-                    <h3 className="quick-card-title">Attendance</h3>
-                    <p className="quick-card-desc">Check in/out and view your attendance log</p>
+                    <h3 className="quick-card-title">Attendance Tracking</h3>
+                    <p className="quick-card-desc">Check in/out and view daily & weekly logs</p>
                     <button className="quick-card-btn">
                       View Attendance <ChevronRight size={16} />
                     </button>
@@ -352,8 +423,10 @@ export default function EmployeeDashboard() {
                 </div>
               </section>
             </>
-          ) : (
-            /* VIEW PROFILE DASHBOARD */
+          )}
+
+          {/* TAB 2: VIEW PROFILE DASHBOARD */}
+          {activeTab === 'profile' && (
             <div className="profile-container">
               {saveSuccessMsg && (
                 <div className="status-badge status-approved" style={{ padding: '0.85rem 1.25rem', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.95rem' }}>
@@ -662,10 +735,172 @@ export default function EmployeeDashboard() {
               )}
             </div>
           )}
+
+          {/* TAB 3: ATTENDANCE TRACKING DASHBOARD */}
+          {activeTab === 'attendance' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', animation: 'fadeIn 0.4s ease-out' }}>
+              {/* Check-In / Check-Out Hero Widget */}
+              <div className="attendance-hero-card">
+                <div className="checkin-status-info">
+                  <div className={`checkin-pulse-icon ${isCheckedIn ? 'checked-in' : 'checked-out'}`}>
+                    {isCheckedIn ? <Clock size={28} /> : <Pause size={28} />}
+                  </div>
+                  <div>
+                    <div className="checkin-time-title">
+                      {isCheckedIn ? 'Shift In Progress' : 'Currently Checked Out'}
+                    </div>
+                    <div style={{ fontSize: '0.9rem', color: 'var(--neutral-300)', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginTop: '0.2rem' }}>
+                      <span>Check-In: <strong>{checkInTime}</strong></span>
+                      <span>Check-Out: <strong>{checkOutTime}</strong></span>
+                      <span>Today's Status: {renderStatusBadge(todayStatus)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="checkin-action-btns">
+                  {isCheckedIn && (
+                    <div style={{ textAlign: 'right', marginRight: '0.5rem' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--neutral-400)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Logged Duration</div>
+                      <div className="checkin-timer-count">{formatTimer(workSeconds)}</div>
+                    </div>
+                  )}
+                  
+                  <button
+                    className={isCheckedIn ? 'btn-checkout-large' : 'btn-checkin-large'}
+                    onClick={handleToggleCheckIn}
+                  >
+                    {isCheckedIn ? (
+                      <>
+                        <Pause size={20} /> Check Out Now
+                      </>
+                    ) : (
+                      <>
+                        <Play size={20} /> Check In Now
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Type Legend Bar */}
+              <div className="status-legend-bar">
+                <span style={{ fontWeight: 700, color: 'white', marginRight: '0.5rem' }}>Attendance Status Types:</span>
+                {Object.keys(ATTENDANCE_STATUS_TYPES).map((key) => {
+                  const type = ATTENDANCE_STATUS_TYPES[key];
+                  return (
+                    <div key={key} className="status-legend-item">
+                      <span className="status-dot" style={{ background: type.color }} />
+                      <span style={{ color: type.color, fontWeight: 600 }}>{type.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Daily View vs Weekly View Header */}
+              <div className="view-switch-nav">
+                <h2 className="section-title">
+                  {attendanceView === 'daily' ? "Today's Daily Attendance Timeline" : 'Weekly Attendance Overview'}
+                </h2>
+
+                <div className="view-switch-btns">
+                  <button
+                    className={`view-switch-btn ${attendanceView === 'daily' ? 'active' : ''}`}
+                    onClick={() => setAttendanceView('daily')}
+                  >
+                    <Clock size={16} /> Daily View
+                  </button>
+                  <button
+                    className={`view-switch-btn ${attendanceView === 'weekly' ? 'active' : ''}`}
+                    onClick={() => setAttendanceView('weekly')}
+                  >
+                    <CalendarRange size={16} /> Weekly View
+                  </button>
+                </div>
+              </div>
+
+              {/* DAILY ATTENDANCE VIEW */}
+              {attendanceView === 'daily' && (
+                <div className="profile-content-grid">
+                  <div className="profile-card">
+                    <div className="profile-card-header">
+                      <h3 className="profile-card-title"><Clock className="profile-card-title-icon" size={20} /> Shift Log Summary (Today)</h3>
+                    </div>
+                    <div className="profile-details-grid">
+                      <div className="profile-detail-field">
+                        <span className="profile-detail-label">First Check-In</span>
+                        <span className="profile-detail-value">{checkInTime}</span>
+                      </div>
+                      <div className="profile-detail-field">
+                        <span className="profile-detail-label">Last Check-Out</span>
+                        <span className="profile-detail-value">{checkOutTime}</span>
+                      </div>
+                      <div className="profile-detail-field">
+                        <span className="profile-detail-label">Effective Work Hours</span>
+                        <span className="profile-detail-value">{formatTimer(workSeconds)}</span>
+                      </div>
+                      <div className="profile-detail-field">
+                        <span className="profile-detail-label">Assigned Status</span>
+                        <span className="profile-detail-value">{renderStatusBadge(todayStatus)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="profile-card">
+                    <div className="profile-card-header">
+                      <h3 className="profile-card-title"><ListFilter className="profile-card-title-icon" size={20} /> Daily Activity Log</h3>
+                    </div>
+                    <div className="activity-list">
+                      {MOCK_DAILY_TIMELINE.map((item, i) => (
+                        <div key={i} className="activity-item">
+                          <div className="activity-icon" style={{ background: 'rgba(99, 102, 241, 0.15)', color: 'var(--primary-400)' }}>
+                            <Clock size={18} />
+                          </div>
+                          <div className="activity-body">
+                            <div className="activity-title">{item.title}</div>
+                            <div className="activity-desc">{item.desc}</div>
+                          </div>
+                          <div className="activity-time">{item.time}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* WEEKLY ATTENDANCE VIEW */}
+              {attendanceView === 'weekly' && (
+                <div className="weekly-grid">
+                  {weeklyRecords.map((item) => (
+                    <div key={item.id} className={`weekly-card ${item.isToday ? 'today' : ''}`}>
+                      <div className="weekly-card-header">
+                        <div>
+                          <div className="weekly-day-name">{item.day} {item.isToday && <span style={{ fontSize: '0.7rem', color: 'var(--primary-400)', fontWeight: 700 }}>(Today)</span>}</div>
+                          <div className="weekly-date-sub">{item.date}</div>
+                        </div>
+                        {renderStatusBadge(item.status)}
+                      </div>
+
+                      <div>
+                        <div className="weekly-hours-val">{item.hours}</div>
+                        <div className="weekly-times" style={{ marginTop: '0.4rem' }}>
+                          <span>In: {item.checkIn}</span>
+                          <span>Out: {item.checkOut}</span>
+                        </div>
+                      </div>
+                      
+                      <div style={{ fontSize: '0.75rem', color: 'var(--neutral-400)', fontStyle: 'italic', borderTop: '1px solid var(--surface-glass-border)', paddingTop: '0.5rem' }}>
+                        {item.note}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </main>
 
-      {/* EDIT PROFILE MODAL (Employee vs Admin Permissions) */}
+      {/* EDIT PROFILE MODAL */}
       {isEditModalOpen && (
         <div className="modal-overlay" onClick={() => setIsEditModalOpen(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
@@ -678,7 +913,6 @@ export default function EmployeeDashboard() {
               </button>
             </div>
 
-            {/* Role Switcher Toolbar */}
             <div className="role-switcher-banner">
               <div className="role-switcher-title">
                 Editing Permissions Mode: <strong>{editingRole === 'employee' ? 'Standard Employee (Limited Fields)' : 'Admin / HR (All Fields Editable)'}</strong>
@@ -701,10 +935,8 @@ export default function EmployeeDashboard() {
               </div>
             </div>
 
-            {/* Form Body */}
             <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div className="modal-body">
-                {/* Personal Information Group */}
                 <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary-400)', borderBottom: '1px solid var(--surface-glass-border)', paddingBottom: '0.4rem' }}>
                   Personal Information
                 </h4>
@@ -773,130 +1005,6 @@ export default function EmployeeDashboard() {
                       className="form-input"
                       value={editFormData.email}
                       onChange={(e) => handleInputChange('email', e.target.value)}
-                      disabled={editingRole === 'employee'}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">
-                      Date of Birth
-                      {editingRole === 'employee' && <span className="locked-indicator"><Lock size={11} /> Admin Only</span>}
-                    </label>
-                    <input
-                      type="date"
-                      className="form-input"
-                      value={editFormData.dob}
-                      onChange={(e) => handleInputChange('dob', e.target.value)}
-                      disabled={editingRole === 'employee'}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">
-                      Gender
-                      {editingRole === 'employee' && <span className="locked-indicator"><Lock size={11} /> Admin Only</span>}
-                    </label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editFormData.gender}
-                      onChange={(e) => handleInputChange('gender', e.target.value)}
-                      disabled={editingRole === 'employee'}
-                    />
-                  </div>
-                </div>
-
-                {/* Job Information Group */}
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary-400)', borderBottom: '1px solid var(--surface-glass-border)', paddingBottom: '0.4rem', marginTop: '0.5rem' }}>
-                  Job & Employment Details
-                </h4>
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label className="form-label">
-                      Designation
-                      {editingRole === 'employee' && <span className="locked-indicator"><Lock size={11} /> Admin Only</span>}
-                    </label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editFormData.designation}
-                      onChange={(e) => handleInputChange('designation', e.target.value)}
-                      disabled={editingRole === 'employee'}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">
-                      Department
-                      {editingRole === 'employee' && <span className="locked-indicator"><Lock size={11} /> Admin Only</span>}
-                    </label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editFormData.department}
-                      onChange={(e) => handleInputChange('department', e.target.value)}
-                      disabled={editingRole === 'employee'}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">
-                      Work Location
-                      {editingRole === 'employee' && <span className="locked-indicator"><Lock size={11} /> Admin Only</span>}
-                    </label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editFormData.workLocation}
-                      onChange={(e) => handleInputChange('workLocation', e.target.value)}
-                      disabled={editingRole === 'employee'}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">
-                      Manager
-                      {editingRole === 'employee' && <span className="locked-indicator"><Lock size={11} /> Admin Only</span>}
-                    </label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editFormData.manager}
-                      onChange={(e) => handleInputChange('manager', e.target.value)}
-                      disabled={editingRole === 'employee'}
-                    />
-                  </div>
-                </div>
-
-                {/* Salary Information Group */}
-                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--primary-400)', borderBottom: '1px solid var(--surface-glass-border)', paddingBottom: '0.4rem', marginTop: '0.5rem' }}>
-                  Salary Structure (Admin Controlled)
-                </h4>
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label className="form-label">
-                      Annual Package (CTC)
-                      {editingRole === 'employee' && <span className="locked-indicator"><Lock size={11} /> Admin Only</span>}
-                    </label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editFormData.annualPackage}
-                      onChange={(e) => handleInputChange('annualPackage', e.target.value)}
-                      disabled={editingRole === 'employee'}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">
-                      Monthly Base Pay
-                      {editingRole === 'employee' && <span className="locked-indicator"><Lock size={11} /> Admin Only</span>}
-                    </label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editFormData.monthlyBase}
-                      onChange={(e) => handleInputChange('monthlyBase', e.target.value)}
                       disabled={editingRole === 'employee'}
                     />
                   </div>
